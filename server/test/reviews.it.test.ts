@@ -4,7 +4,7 @@ import { waitForPrRuns } from './helpers/runs.js';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
 import { seed } from '../src/db/seed.js';
-import { MockLLMProvider, MockEmbedder, MockGitClient } from '../src/adapters/mocks.js';
+import { MockLLMProvider, MockEmbedder, MockGitClient, MockGitHubClient } from '../src/adapters/mocks.js';
 import * as t from '../src/db/schema.js';
 import { eq } from 'drizzle-orm';
 import type { Review } from '@devdigest/shared';
@@ -212,6 +212,70 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('records run cost + tokens and exposes them on runs, reviews, trace and the PR list', async () => {
+    // MockLLMProvider reports tokensIn=100, tokensOut=50, costUsd=0.001 per call;
+    // the one-file diff is reviewed in a single call.
+    const overrides = { embedder: new MockEmbedder(), git: new MockGitClient({ diff: DIFF }), github: new MockGitHubClient() };
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: { ...overrides, llm: { openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }) } },
+    });
+    const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Cost', provider: 'openai', model: 'gpt-4.1', system_prompt: 'sec' },
+      })
+    ).json();
+
+    const runId = (
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+    ).json().runs[0].run_id;
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    const [row] = await pg.handle.db.select().from(t.agentRuns).where(eq(t.agentRuns.id, runId));
+    expect(row!.costUsd).toBeCloseTo(0.001);
+
+    const runs = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/runs` })).json();
+    expect(runs[0]).toMatchObject({ run_id: runId, tokens_in: 100, tokens_out: 50 });
+    expect(runs[0].cost_usd).toBeCloseTo(0.001);
+
+    const reviews = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })).json();
+    expect(reviews[0]).toMatchObject({ run_id: runId, tokens_in: 100, tokens_out: 50 });
+    expect(reviews[0].cost_usd).toBeCloseTo(0.001);
+
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+    expect(trace.stats.cost_usd).toBeCloseTo(0.001);
+
+    // Second successful run → the PR list sums both.
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 2 });
+    await app.close();
+
+    // A failed run (fixture fails the Review schema) records no cost and does
+    // not change the PR total.
+    const failing = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: { ...overrides, llm: { openai: new MockLLMProvider('openai', { structured: {} }) } },
+    });
+    const failedRunId = (
+      await failing.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+    ).json().runs[0].run_id;
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 3 });
+    const failedRuns = (await failing.inject({ method: 'GET', url: `/pulls/${pr.id}/runs` })).json();
+    const failed = failedRuns.find((r: { run_id: string }) => r.run_id === failedRunId);
+    expect(failed.status).toBe('failed');
+    expect(failed.cost_usd).toBeNull();
+
+    const pulls = (await failing.inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })).json();
+    const listed = pulls.find((p: { id: string }) => p.id === pr.id);
+    expect(listed.cost_usd).toBeCloseTo(0.002);
+    await failing.close();
+  });
+
   it('dual-provider structured output: anthropic provider returns the same Review shape', async () => {
     const app = await appWith(REVIEW_FIXTURE, 'anthropic');
     const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
@@ -259,6 +323,62 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     ).json();
     expect(dismissed.finding.dismissed_at).not.toBeNull();
     expect(dismissed.finding.accepted_at).toBeNull();
+
+    await app.close();
+  });
+
+  it('findings breakdown on runs + PR list: latest review, dismissed excluded', async () => {
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        github: new MockGitHubClient(),
+        llm: { openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }) },
+      },
+    });
+    const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Labels', provider: 'openai', model: 'gpt-4.1', system_prompt: 's' },
+      })
+    ).json();
+    const runId = (
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+    ).json().runs[0].run_id;
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    // Grounding keeps only the CRITICAL finding (the WARNING is off-diff).
+    const expected = { CRITICAL: 1, WARNING: 0, SUGGESTION: 0 };
+    const runs = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/runs` })).json();
+    const run = runs.find((r: { run_id: string }) => r.run_id === runId);
+    expect(run.findings.counts).toEqual(expected);
+    expect(run.findings.items[0]).toMatchObject({
+      severity: 'CRITICAL',
+      category: 'security',
+      title: 'Hardcoded Stripe secret key',
+      file: 'src/config.ts',
+      start_line: 11,
+    });
+    expect(run.findings.items[0].suggestion).toBeUndefined();
+
+    const listed = () =>
+      app
+        .inject({ method: 'GET', url: `/repos/${repo.id}/pulls` })
+        .then((res) => res.json().find((p: { id: string }) => p.id === pr.id));
+    expect((await listed()).findings.counts).toEqual(expected);
+
+    // Dismissing the only finding empties both surfaces (but keeps them non-null:
+    // the PR was reviewed).
+    const findingId = run.findings.items[0].id;
+    await app.inject({ method: 'POST', url: `/findings/${findingId}/dismiss` });
+    const empty = { counts: { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 }, items: [] };
+    const after = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/runs` })).json();
+    expect(after.find((r: { run_id: string }) => r.run_id === runId).findings).toEqual(empty);
+    expect((await listed()).findings).toEqual(empty);
 
     await app.close();
   });

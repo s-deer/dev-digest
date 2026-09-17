@@ -4,6 +4,8 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
 import type { RunSummary, PrCommit } from "@devdigest/shared";
+import { RunCostBadge } from "@/components/run-cost-badge";
+import { FindingsBadges } from "@/components/findings-summary";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -189,14 +191,21 @@ export function RunHistory({
                 </div>
               )}
               {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
-                  {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
+                <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--text-muted)" }}>
+                  {r.findings ? (
+                    <FindingsBadges summary={r.findings} />
+                  ) : (
+                    t("runStatus.findings", { count: r.findings_count ?? 0 })
+                  )}
+                  {(r.blockers ?? 0) > 0 ? <span>{t("runStatus.blockers", { count: r.blockers ?? 0 })}</span> : null}
                 </div>
               )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2, fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
               {r.ran_at && <span>{new Date(r.ran_at).toLocaleTimeString()}</span>}
+              {settled && (
+                <RunCostBadge variant="detailed" usd={r.cost_usd} tokensIn={r.tokens_in} tokensOut={r.tokens_out} />
+              )}
             </div>
             <button
               type="button"

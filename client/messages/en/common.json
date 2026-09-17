@@ -17,5 +17,12 @@
     "title": "No repo selected",
     "body": "This repository isn't in your workspace — it may have been removed, or the link is stale. Add a repo or pick another from the switcher to get started.",
     "cta": "Add repository"
+  },
+  "runCost": {
+    "title": "Cost of this review"
+  },
+  "findingsSummary": {
+    "title": "{count, plural, one {# finding} other {# findings}}",
+    "header": "{count, plural, one {# finding} other {# findings}} in this run"
   }
 }
