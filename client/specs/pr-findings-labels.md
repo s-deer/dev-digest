@@ -84,7 +84,7 @@ Gaps against the design:
 
 No `FindingsTooltip`-equivalent component exists yet anywhere in
 `client/src/vendor/ui` or the page-local `_components/` — it would be new,
-and (per `CLAUDE.md`) belongs as a page-local component, not a vendor/ui
+and (per `AGENTS.md`) belongs as a page-local component, not a vendor/ui
 addition, unless it's meant to be reused across pages.
 
 ## Decisions (confirmed with user)
@@ -146,7 +146,7 @@ addition, unless it's meant to be reused across pages.
   badges (+ hover tooltip, reusing the component built for the list).
 - Consider a single shared `FindingsTooltip`-equivalent component (page-local
   under `pulls/`, or promoted to `@devdigest/ui` if both the list and the PR
-  detail page need it — per `CLAUDE.md`, only vendor it if it's a genuine
+  detail page need it — per `AGENTS.md`, only vendor it if it's a genuine
   cross-page primitive, not a one-off).
 - Tests: `PRRow`/list page tests (new), `RunHistory.test.tsx` (currently
   asserts the plain-text counts — will need updating), any new

@@ -33,7 +33,7 @@ say so in one line and move on.
 
 - Routine edits, renames, one-off typos.
 - Anything an agent could infer from the code or config in ~5 minutes.
-- Anything already in a `CLAUDE.md`, `README.md`, `docs/`, or `specs/`.
+- Anything already in a `AGENTS.md`, `README.md`, `docs/`, or `specs/`.
 - Unverified hypotheses ("probably a race condition").
 - Generic programming knowledge ("await inside loops is slow").
 - Facts about code that the same change is rewriting.
@@ -131,12 +131,12 @@ Do not prune unless asked.
 - **English**, terse, declarative.
 - Spell the four section headings exactly as in step 4 — agents grep for them.
 
-## Promotion to CLAUDE.md
+## Promotion to AGENTS.md
 
 When an insight has hardened into a rule every change must follow (it keeps
 getting applied, and ignoring it breaks things), propose moving it into that
-package's `CLAUDE.md`. Ask before editing CLAUDE.md. Once moved, append
-`> **Promoted YYYY-MM-DD** to CLAUDE.md` under the entry.
+package's `AGENTS.md`. Ask before editing AGENTS.md. Once moved, append
+`> **Promoted YYYY-MM-DD** to AGENTS.md` under the entry.
 
 ## Prune and consolidate (only on request)
 
