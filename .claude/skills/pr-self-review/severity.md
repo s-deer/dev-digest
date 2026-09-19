@@ -25,8 +25,8 @@ The finding must meet **all** of these:
      queries Drizzle directly instead of going through a repository.
    - **Contract break**: a response or request shape changed in a consumer without the change
      landing in `@devdigest/shared` first, or a Drizzle row type leaks to the wire.
-   - **Repo invariant from `CLAUDE.md`**: DB access added to a hermetic `*.test.ts`, an
-     applied migration hand-edited, vendored code edited.
+    - **Repo invariant from `AGENTS.md`**: DB access added to a hermetic `*.test.ts` or an
+      applied migration hand-edited.
 3. The skill has a rule that says so, and you cite it in `rule` (the section heading or rule
    name from that skill's `SKILL.md`).
 

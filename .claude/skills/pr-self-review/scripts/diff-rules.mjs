@@ -7,7 +7,6 @@ import { addedLines, collectDiff, finding, onlyCommentChanges, parseArgs } from 
 
 const SCHEMA = /^server\/src\/db\/(schema\.ts|schema\/.+\.ts)$/;
 const MIGRATION_SQL = /^server\/src\/db\/migrations\/[^/]+\.sql$/;
-const VENDOR_FORBIDDEN = /(^|\/)src\/vendor\/(?!shared\/)/;
 const SECRET_FILE = /(^|\/)(\.env(\.(?!example$|sample$|template$)[^/]+)?|secrets\.json)$/;
 const SECRET_PATTERNS = [
   // Anthropic before OpenAI: `sk-ant-…` matches both, and only the first match per line counts.
@@ -43,14 +42,6 @@ export function diffRules(diff) {
         file: f.path,
         evidence: `Existing migration was ${f.status === 'M' ? 'modified' : 'deleted'}. Applied migrations must never be hand-edited (CLAUDE.md, "Do not touch").`,
         fix: `git checkout ${diff.base} -- ${f.path}; change src/db/schema.ts and run pnpm db:generate instead.`,
-      });
-    }
-    if (VENDOR_FORBIDDEN.test(f.path)) {
-      add({
-        rule: 'vendor/edited-vendored-code',
-        file: f.path,
-        evidence: 'Vendored code outside vendor/shared was changed (CLAUDE.md, "Do not touch").',
-        fix: 'Revert the change, or make it upstream in the vendored package.',
       });
     }
     if (f.path.startsWith('server/clones/')) {

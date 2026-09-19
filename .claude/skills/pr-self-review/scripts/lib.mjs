@@ -35,7 +35,6 @@ const HARD_EXCLUDE = [/^server\/clones\//, /(^|\/)node_modules(\/|$)/, /(^|\/)(d
 // Changed, but not handed to reviewers or package checks. Diff rules still see them.
 const REVIEW_EXCLUDE = [
   /(^|\/)(pnpm-lock\.yaml|package-lock\.json|skills-lock\.json)$/,
-  /(^|\/)src\/vendor\/(?!shared\/)/,
   /^server\/src\/db\/migrations\//,
 ];
 

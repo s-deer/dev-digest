@@ -125,8 +125,8 @@ ask. The reason is stored in the verdict.
   that has no hook installed, or by merging in the GitHub UI. The hard guarantee needs a required
   status check in CI, which this skill does not provide.
 - Hermetic tests only by default. `*.it.test.ts` need Docker; pass `--it` to include them.
-- Deleted files, lockfiles, generated migrations and vendored code (except `vendor/shared`) go to
-  no reviewer. Diff rules still see them.
+- Deleted files, lockfiles, and generated migrations go to no reviewer. Diff rules still see
+  them. Vendored source is reviewed using the same routing rules as application source.
 
 ## Files
 
