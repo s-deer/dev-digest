@@ -9,14 +9,19 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [fastify-best-practices](fastify-best-practices/SKILL.md) | Backend | Fastify routes, plugins, JSON-schema validation, error handling |
 | [drizzle-orm-patterns](drizzle-orm-patterns/SKILL.md) | Backend | Drizzle schema, queries, relations, transactions, migrations |
 | [postgresql-table-design](postgresql-table-design/SKILL.md) | Backend | Postgres schema design, data types, indexing, constraints |
+| [onion-architecture](onion-architecture/SKILL.md) | Backend | Onion layering for `server/` modules: dependency rule, ports & adapters, composition root |
 | [next-best-practices](next-best-practices/SKILL.md) | Frontend | Next.js App Router, RSC boundaries, data fetching, optimization |
 | [react-best-practices](react-best-practices/SKILL.md) | Frontend | React anti-patterns, state management, hooks rules |
+| [react-architecture](react-architecture/SKILL.md) | Frontend | Where code lives: components, constants, utils/helpers, business logic, data layer, Next.js server code, boundaries. Sources in its README |
 | [react-testing-library](react-testing-library/SKILL.md) | Frontend | General-purpose React Testing Library guide with Vitest |
 | [zod](zod/SKILL.md) | Full-stack | Zod schema validation, parsing, error handling, type inference |
 | [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Capture verified non-obvious lessons into per-package INSIGHTS.md |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
+| [pr-self-review](pr-self-review/SKILL.md) | Shared | Pre-PR review of the local diff with the skills above; a confirmed critical blocks the PR |
+
+Adding a review skill? Add a row to [`pr-self-review/routing.md`](pr-self-review/routing.md) so it runs on the right files (or list it under *Not reviewers*). Otherwise `/pr-self-review` warns about an unrouted skill.
 
 ## What Are Skills?
 
