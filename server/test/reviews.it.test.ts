@@ -61,6 +61,14 @@ const REVIEW_FIXTURE: Review = {
 };
 
 let repoSeq = 0;
+async function waitUntil(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) throw new Error('Timed out waiting for test condition');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 async function setupRepoAndPr(db: PgFixture['handle']['db'], workspaceId: string) {
   const name = `payments-api-${repoSeq++}`;
   const [repo] = await db
@@ -293,6 +301,45 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     ).json();
     expect(reviews[0].findings).toHaveLength(1);
     expect(reviews[0].model).toBe('claude-x');
+    await app.close();
+  });
+
+  it('cancels an in-flight run without persisting a review or reverting to done', async () => {
+    const llm = new MockLLMProvider('openai', {
+      structured: REVIEW_FIXTURE,
+      structuredDelayMs: 250,
+    });
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        llm: { openai: llm },
+      },
+    });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'CancelAgent', provider: 'openai', model: 'gpt-4.1', system_prompt: 's' },
+      })
+    ).json();
+    const runId = (
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+    ).json().runs[0].run_id;
+
+    await waitUntil(() => llm.calls.some((call) => call.method === 'completeStructured'));
+    const cancelled = await app.inject({ method: 'POST', url: `/runs/${runId}/cancel` });
+    expect(cancelled.statusCode).toBe(200);
+
+    const runs = await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+    const run = runs.find((candidate) => candidate.id === runId);
+    expect(run?.status).toBe('cancelled');
+
+    const reviews = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })).json();
+    expect(reviews).toHaveLength(0);
     await app.close();
   });
 

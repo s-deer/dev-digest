@@ -21,11 +21,12 @@ const TRACE: RunTrace = {
 
 // Swappable per test (e.g. a pre-feature trace with no stats.cost_usd).
 let currentTrace: RunTrace = TRACE;
+let currentLiveRunning = false;
 vi.mock("../../../../../../../lib/hooks/trace", () => ({
   useRunTrace: () => ({ data: currentTrace, isLoading: false }),
 }));
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
-  useRunEvents: () => ({ events: [], running: false }),
+  useRunEvents: () => ({ events: [], running: currentLiveRunning }),
 }));
 
 import RunTraceDrawer from "./RunTraceDrawer";
@@ -33,6 +34,7 @@ import RunTraceDrawer from "./RunTraceDrawer";
 afterEach(() => {
   cleanup();
   currentTrace = TRACE;
+  currentLiveRunning = false;
 });
 
 function renderWithIntl(ui: React.ReactElement) {
@@ -70,6 +72,15 @@ describe("A5 Run Trace drawer (smoke)", () => {
     renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
     fireEvent.click(screen.getByText("log"));
     // LiveLogStream renders its filter input
+    expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
+  });
+
+  it("opens on the live log while a run is still running", () => {
+    currentLiveRunning = true;
+    renderWithIntl(
+      <RunTraceDrawer runId="r1" agentName="Security" prNumber={482} running onClose={() => {}} />,
+    );
+    expect(screen.getByText(/Running/)).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
   });
 });

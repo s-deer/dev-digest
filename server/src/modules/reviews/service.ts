@@ -78,15 +78,20 @@ export class ReviewService {
 
   /**
    * Cancel an in-flight run. Signals a live runner to stop at its next
-   * checkpoint AND marks the DB row cancelled + completes the bus immediately —
-   * so cancel also works for ORPHANED runs (whose background process died on a
-   * server restart) where signalling alone would do nothing.
+   * checkpoint and marks the DB row cancelled. Orphaned runs have no executor
+   * to close the bus, so only those are completed here.
    */
-  async cancelRun(runId: string): Promise<void> {
+  async cancelRun(workspaceId: string, runId: string): Promise<void> {
+    await this.ensureRun(workspaceId, runId);
+    const live = this.container.runBus.isActive(runId);
     this.publish(runId, 'info', 'Cancellation requested — stopping…');
     this.container.runBus.cancel(runId);
-    await this.repo.cancelRunIfRunning(runId);
-    this.container.runBus.complete(runId);
+    await this.repo.cancelRunIfRunning(workspaceId, runId);
+    if (!live) this.container.runBus.complete(runId);
+  }
+
+  async ensureRun(workspaceId: string, runId: string): Promise<void> {
+    if (!(await this.repo.hasRun(workspaceId, runId))) throw new NotFoundError('Run not found');
   }
 
   /** Reap runs left 'running' by a previous (now-dead) process. Called on boot. */
@@ -126,6 +131,7 @@ export class ReviewService {
       });
       runs.push({ run_id: runId, agent_id: agent.id, agent_name: agent.name });
       jobs.push({ agent, runId });
+      this.container.runBus.start(runId);
     }
 
     // Fire-and-forget: the HTTP response returns now with the runIds; reviews
@@ -173,7 +179,7 @@ export class ReviewService {
     );
   }
 
-  async getRunTrace(runId: string): Promise<RunTrace | undefined> {
-    return this.repo.getRunTrace(runId);
+  async getRunTrace(workspaceId: string, runId: string): Promise<RunTrace | undefined> {
+    return this.repo.getRunTrace(workspaceId, runId);
   }
 }

@@ -51,6 +51,8 @@ export interface MockLLMOptions {
    * by req.schemaName; falls back to `structured` when no entry matches.
    */
   structuredBySchema?: Record<string, unknown>;
+  /** Delay structured responses so cancellation races can be tested. */
+  structuredDelayMs?: number;
   completionText?: string;
   embedding?: number[];
 }
@@ -88,6 +90,9 @@ export class MockLLMProvider implements LLMProvider {
 
   async completeStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     this.calls.push({ method: 'completeStructured', req });
+    if (this.opts.structuredDelayMs) {
+      await new Promise((resolve) => setTimeout(resolve, this.opts.structuredDelayMs));
+    }
     const fixture = this.opts.structuredBySchema?.[req.schemaName] ?? this.opts.structured ?? {};
     const parsed = (req.schema as z.ZodType<T>).safeParse(fixture);
     if (!parsed.success) {

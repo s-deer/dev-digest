@@ -7,6 +7,12 @@ re-discovered the hard way.
 
 ## Gotchas & recurring errors
 
+### 2026-09-19 · Findings keyboard shortcuts must be scoped to the focused panel
+- **Context:** `FindingsPanel` is mounted inside multiple review accordions on the PR detail page.
+- **Insight:** A `window` keydown listener in every panel makes one shortcut trigger all mounted panels and also intercepts modified browser shortcuts such as Cmd/Ctrl+A.
+- **Do:** Handle shortcuts on a focusable panel root, ignore modifier keys and editable controls, and keep the empty-list path from producing focus index `-1`.
+- **Evidence:** `client/src/app/repos/[repoId]/pulls/[number]/_components/FindingsPanel/FindingsPanel.tsx` and its keyboard-scope test.
+
 ### 2026-09-17 · The PR list table card clips any absolutely positioned popover inside a row
 - **Context:** hover popovers or tooltips inside `/repos/:repoId/pulls` rows
 - **Insight:** `s.tableCard` sets `overflow: "hidden"` to keep the rounded corners. A `position: absolute` popover in a row gets cut off at the card edge, worst on the bottom rows.

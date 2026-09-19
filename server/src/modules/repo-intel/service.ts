@@ -54,6 +54,7 @@ import {
 } from './constants.js';
 import { runFullIndex, type IndexPayload } from './pipeline/full.js';
 import { runIncremental } from './pipeline/incremental.js';
+import { NotFoundError } from '../../platform/errors.js';
 
 /**
  * GLOBALS allowlist — common JS/TS builtins + runtime that appear as bare
@@ -202,6 +203,10 @@ export class RepoIntelService implements RepoIntel {
       degraded: true,
       degradedReason: 'no_data',
     };
+  }
+
+  async ensureRepoAccess(workspaceId: string, repoId: string): Promise<void> {
+    if (!(await this.repo.hasRepo(workspaceId, repoId))) throw new NotFoundError('Repository not found');
   }
 
   // -------------------------------------------------------------------------

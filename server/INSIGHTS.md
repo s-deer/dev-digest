@@ -7,6 +7,12 @@ re-discovered the hard way.
 
 ## Decisions
 
+### 2026-09-19 · SSE completion is not background-runner liveness
+- **Context:** cancellation of `agent_runs` through `ReviewService.cancelRun` and `RunBus`.
+- **Insight:** `RunBus.complete()` closes the stream and clears cancellation, but an executor can still be running; using completion to detect an orphan lets the executor overwrite `cancelled` with `done`.
+- **Do:** Track active executors separately, leave live runs for the executor to complete, and guard terminal persistence with `status='running'`.
+- **Evidence:** `server/src/platform/sse.ts`, `modules/reviews/service.ts`, `modules/reviews/repository/run.repo.ts`, and the in-flight cancellation integration test.
+
 ### 2026-09-17 · Timeline findings breakdown is a read-time join on `reviews.run_id`, not denormalized onto `agent_runs`
 - **Context:** `RunSummary.findings` in `listRunsForPull`; `PrMeta.findings` on `GET /repos/:id/pulls`
 - **Insight:** The hover tooltip needs each finding's details (title, file:line, rationale), which counts stored on `agent_runs` can't carry. Stored counts would also go stale when a finding is dismissed and would be missing for old runs. The PR list uses only the latest review, the same one the score comes from. Both surfaces skip dismissed findings. This reverses the older "findings intentionally not surfaced on the list" note that used to be in `routes.ts`.
