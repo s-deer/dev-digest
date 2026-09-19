@@ -23,8 +23,8 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  * with a few findings, reusable demo skills, and the built-in reviewers, all on
  * the default openrouter/deepseek-v4-flash provider+model.
  *
- * Course lessons populate the remaining tables (conventions, memory, eval, …)
- * once their features are built — they start empty here.
+ * Course lessons populate the remaining tables (memory, eval, …) once their
+ * features are built; conventions include a small read-only demo scan below.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -92,6 +92,75 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .returning();
   }
   const repoId = repo!.id;
+
+  // ---- convention extractor demo scan (read-only browser fixture) ---------
+  const demoScanId = '00000000-0000-0000-0000-000000000101';
+  await db
+    .insert(t.conventionScans)
+    .values({
+      id: demoScanId,
+      workspaceId,
+      repoId,
+      status: 'done',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      sampledFiles: ['package.json', 'src/api/users.ts', 'src/middleware/ratelimit.ts'],
+      proposed: 3,
+      kept: 3,
+      droppedUngrounded: 0,
+      droppedDuplicate: 0,
+      costUsd: 0.001,
+      startedAt: new Date('2026-09-19T08:00:00.000Z'),
+      finishedAt: new Date('2026-09-19T08:00:45.000Z'),
+    })
+    .onConflictDoNothing();
+  await db
+    .insert(t.conventions)
+    .values([
+      {
+        id: '00000000-0000-0000-0000-000000000111',
+        workspaceId,
+        repoId,
+        scanId: demoScanId,
+        category: 'api',
+        rule: 'Validate request bodies at the route boundary with the shared schema.',
+        rationale: 'Routes reject malformed input before service logic runs.',
+        evidencePath: 'src/api/users.ts',
+        evidenceLine: 18,
+        evidenceSnippet: 'schema: { body: CreateUserBody }',
+        confidence: 0.94,
+        status: 'accepted',
+      },
+      {
+        id: '00000000-0000-0000-0000-000000000112',
+        workspaceId,
+        repoId,
+        scanId: demoScanId,
+        category: 'errors',
+        rule: 'Translate domain failures into the shared error envelope.',
+        rationale: 'Clients can render stable error codes instead of parsing strings.',
+        evidencePath: 'src/api/users.ts',
+        evidenceLine: 31,
+        evidenceSnippet: 'throw new ValidationError("User is invalid")',
+        confidence: 0.88,
+        status: 'pending',
+      },
+      {
+        id: '00000000-0000-0000-0000-000000000113',
+        workspaceId,
+        repoId,
+        scanId: demoScanId,
+        category: 'structure',
+        rule: 'Keep external integrations behind injected adapters.',
+        rationale: 'Services remain testable without network credentials.',
+        evidencePath: 'src/middleware/ratelimit.ts',
+        evidenceLine: 9,
+        evidenceSnippet: 'constructor(private readonly limiter: RateLimiter) {}',
+        confidence: 0.82,
+        status: 'pending',
+      },
+    ])
+    .onConflictDoNothing();
 
   // ---- PR #482 (rate limiting) ----
   let [pr] = await db

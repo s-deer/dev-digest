@@ -1,13 +1,14 @@
 import type { Skill, SkillImportPreview, SkillSource, SkillType, SkillVersion } from '@devdigest/shared';
-import { toSkillDto, toSkillVersionDto } from './helpers.js';
+import {
+  toSkillDto,
+  toSkillVersionDto,
+  type SkillCreateValues,
+  type SkillData,
+  type SkillUpdateValues,
+  type SkillVersionData,
+  type SkillWithUsage,
+} from './helpers.js';
 import { parseSkillUpload } from './importer.js';
-import type {
-  InsertSkill,
-  SkillRow,
-  SkillVersionRow,
-  SkillWithUsageRow,
-  UpdateSkill,
-} from './repository.js';
 
 export interface CreateSkillInput {
   name: string;
@@ -31,18 +32,18 @@ export type RestoreResult = { status: 'not_found' } | { status: 'ok'; skill: Ski
 
 /** Persistence port for `SkillsService` — implemented by `SkillsRepository`. */
 export interface SkillsRepo {
-  list(workspaceId: string): Promise<SkillWithUsageRow[]>;
-  getById(workspaceId: string, id: string): Promise<SkillWithUsageRow | undefined>;
-  insert(values: InsertSkill): Promise<SkillRow>;
+  list(workspaceId: string): Promise<SkillWithUsage[]>;
+  getById(workspaceId: string, id: string): Promise<SkillWithUsage | undefined>;
+  insert(values: SkillCreateValues): Promise<SkillData>;
   update(
     workspaceId: string,
     id: string,
-    patch: UpdateSkill,
+    patch: SkillUpdateValues,
     versionNote?: string,
-  ): Promise<SkillRow | undefined>;
+  ): Promise<SkillData | undefined>;
   deleteById(workspaceId: string, id: string): Promise<boolean>;
-  listVersions(workspaceId: string, skillId: string): Promise<SkillVersionRow[] | undefined>;
-  getVersion(skillId: string, version: number): Promise<SkillVersionRow | undefined>;
+  listVersions(workspaceId: string, skillId: string): Promise<SkillVersionData[] | undefined>;
+  getVersion(skillId: string, version: number): Promise<SkillVersionData | undefined>;
 }
 
 /** Application service for skill lifecycle, version history, and import preview. */

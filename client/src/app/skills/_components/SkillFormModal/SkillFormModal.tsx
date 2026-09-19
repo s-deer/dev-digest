@@ -6,7 +6,7 @@ import { Button, Modal } from "@devdigest/ui";
 import type { Skill, SkillImportPreview } from "@devdigest/shared";
 import { useCreateSkill, useUpdateSkill } from "../../../../lib/hooks/skills";
 import { useToast } from "../../../../lib/toast";
-import { EMPTY_DRAFT, SkillForm, isDraftValid, toDraft, type SkillDraft } from "../SkillForm";
+import { EMPTY_DRAFT, SkillForm, isDraftValid, toDraft, type SkillDraft } from "@/components/skill-form";
 
 export type SkillFormMode =
   | { kind: "create" }

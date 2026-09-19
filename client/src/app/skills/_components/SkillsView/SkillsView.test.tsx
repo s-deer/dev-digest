@@ -8,10 +8,6 @@ import { ToastProvider } from "../../../../lib/toast";
 const mocks = vi.hoisted(() => ({ push: vi.fn(), update: vi.fn(), remove: vi.fn() }));
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
-vi.mock("../../../../components/app-shell", () => ({
-  AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
 const SKILLS: Skill[] = [
   {
     id: "sk1", name: "boundary-cases", description: "Flag missing limit tests.", type: "rubric", source: "imported_file",

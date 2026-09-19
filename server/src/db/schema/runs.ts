@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, jsonb, timestamp, doublePrecision } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, jsonb, timestamp, numeric } from 'drizzle-orm/pg-core';
 import { workspaces } from './core';
 import { agents } from './agents';
 import { pullRequests } from './pulls';
@@ -19,7 +19,7 @@ export const agentRuns = pgTable('agent_runs', {
   tokensIn: integer('tokens_in'),
   tokensOut: integer('tokens_out'),
   /** Run cost in USD, snapshotted at completion; null when unknown (unpriced model, failed/cancelled, pre-feature). */
-  costUsd: doublePrecision('cost_usd'),
+  costUsd: numeric('cost_usd').$type<number>(),
   status: text('status'),
   /** Failure reason when status='failed' (LLM/API error, timeout, quota, …). */
   error: text('error'),

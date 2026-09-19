@@ -116,7 +116,9 @@ d('skills routes and agent attachments', () => {
     ]);
     expect((await server.inject({ method: 'POST', url: `/skills/${skill.id}/versions/9/restore` })).statusCode).toBe(404);
 
-    await pg.handle.db.delete(t.skills).where(eq(t.skills.id, skill.id));
+    const deleted = await server.inject({ method: 'DELETE', url: `/skills/${skill.id}` });
+    expect(deleted.statusCode).toBe(200);
+    expect(deleted.json()).toEqual({ ok: true });
     const listed = (await server.inject({ method: 'GET', url: '/skills' })).json() as { id: string }[];
     expect(listed.some((row) => row.id === skill.id)).toBe(false);
     expect((await server.inject({ method: 'GET', url: `/skills/${skill.id}/versions` })).statusCode).toBe(404);

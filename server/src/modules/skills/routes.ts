@@ -39,9 +39,10 @@ const ImportPreviewBody = z.object({
     .string()
     .min(1)
     .max(IMPORT_BODY_LIMIT)
-    .regex(/^[A-Za-z0-9+/]+={0,2}$/, 'Expected base64 content'),
+    .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/, 'Expected base64 content'),
 });
 const VersionParams = IdParams.extend({ version: z.coerce.number().int().positive() });
+const OkResponse = z.object({ ok: z.literal(true) });
 
 /** Reusable skill CRUD, version history, and a non-persisting .md/.zip import preview. */
 export default async function skillsRoutes(appBase: FastifyInstance) {
@@ -101,10 +102,10 @@ export default async function skillsRoutes(appBase: FastifyInstance) {
     return skill;
   });
 
-  app.delete('/skills/:id', { schema: { params: IdParams } }, async (req) => {
+  app.delete('/skills/:id', { schema: { params: IdParams, response: { 200: OkResponse } } }, async (req) => {
     const { workspaceId } = await getContext(app.container, req);
     const deleted = await service.delete(workspaceId, req.params.id);
     if (!deleted) throw new NotFoundError('Skill not found');
-    return { ok: true };
+    return { ok: true as const };
   });
 }

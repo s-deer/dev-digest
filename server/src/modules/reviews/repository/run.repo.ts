@@ -45,10 +45,14 @@ export async function doneRunCostsForPulls(
   prIds: string[],
 ): Promise<{ prId: string | null; costUsd: number | null }[]> {
   if (prIds.length === 0) return [];
-  return db
+  const rows = await db
     .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
     .from(t.agentRuns)
     .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')));
+  return rows.map((row) => ({
+    prId: row.prId,
+    costUsd: row.costUsd == null ? null : Number(row.costUsd),
+  }));
 }
 
 /** All runs for a PR (any status), newest first — the PR run history. */
@@ -89,7 +93,7 @@ export async function listRunsForPull(
     duration_ms: run.durationMs,
     tokens_in: run.tokensIn,
     tokens_out: run.tokensOut,
-    cost_usd: run.costUsd,
+    cost_usd: run.costUsd == null ? null : Number(run.costUsd),
     findings_count: run.findingsCount,
     grounding: run.grounding,
     ran_at: run.ranAt ? run.ranAt.toISOString() : null,

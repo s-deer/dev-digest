@@ -24,3 +24,9 @@ re-discovered the hard way.
 - **Insight:** The primitive only styles inline elements (`p`, `strong`, `code`, `a`); the global reset strips heading sizes and list markers, so the "rendered" view looked like raw text, and inline `code` padding leaked into fenced blocks.
 - **Do:** Keep block styles in `client/src/app/globals.css` under `.dd-md` (the class the primitive already sets); don't edit `src/vendor/ui` or add per-page Markdown CSS.
 - **Evidence:** `client/src/vendor/ui/primitives/Markdown.tsx`, `.dd-md` rules in `client/src/app/globals.css`.
+
+### 2026-09-19 · Duplicate top-level JSON keys silently hide translation messages
+- **Context:** adding localized strings to `client/messages/en/conventions.json`.
+- **Insight:** Two top-level `card` objects parsed successfully, but the later object replaced the first and caused `next-intl` `MISSING_MESSAGE` errors for action labels.
+- **Do:** Keep each translation namespace unique and run a focused component test after editing message JSON; JSON parsing alone will not detect duplicate keys.
+- **Evidence:** `client/messages/en/conventions.json`, `ConventionCard.test.tsx`.

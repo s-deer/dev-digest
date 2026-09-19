@@ -58,11 +58,11 @@ export interface MockLLMOptions {
 }
 
 export class MockLLMProvider implements LLMProvider {
-  readonly id: 'openai' | 'anthropic';
+  readonly id: 'openai' | 'anthropic' | 'openrouter';
   public calls: { method: string; req: unknown }[] = [];
 
   constructor(
-    id: 'openai' | 'anthropic' = 'openai',
+    id: 'openai' | 'anthropic' | 'openrouter' = 'openai',
     private opts: MockLLMOptions = {},
   ) {
     this.id = id;
@@ -72,7 +72,7 @@ export class MockLLMProvider implements LLMProvider {
     this.calls.push({ method: 'listModels', req: null });
     return (
       this.opts.models ?? [
-        { id: 'gpt-4.1', provider: this.id === 'anthropic' ? 'anthropic' : 'openai' },
+        { id: this.id === 'openrouter' ? 'deepseek/deepseek-v4-flash' : 'gpt-4.1', provider: this.id },
       ]
     );
   }

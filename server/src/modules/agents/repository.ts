@@ -1,5 +1,5 @@
-import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
-import type { Db } from '../../db/client.js';
+import { and, asc, count, desc, eq, inArray, max } from 'drizzle-orm';
+import type { Db, DbTx } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
 import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION } from './constants.js';
@@ -239,15 +239,11 @@ export class AgentsRepository {
    */
   async setSkills(agent: AgentRow, links: SkillLinkInput[]): Promise<void> {
     await this.db.transaction(async (tx) => {
-      // Lock the agent row and derive the next version inside the transaction:
-      // `agent.version` was read before it opened, so two concurrent saves would
-      // otherwise both insert the same (agent_id, version) primary key.
-      const [locked] = await tx
-        .select({ version: t.agents.version })
-        .from(t.agents)
-        .where(eq(t.agents.id, agent.id))
-        .for('update');
-      const nextVersion = (locked?.version ?? agent.version) + 1;
+      // Lock and reload the complete row: the caller's agent may be stale by
+      // the time this transaction starts.
+      const [locked] = await tx.select().from(t.agents).where(eq(t.agents.id, agent.id)).for('update');
+      if (!locked) return;
+      const nextVersion = locked.version + 1;
       await tx.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agent.id));
       if (links.length > 0) {
         await tx.insert(t.agentSkills).values(
@@ -264,19 +260,61 @@ export class AgentsRepository {
         agentId: agent.id,
         version: nextVersion,
         configJson: {
-          provider: agent.provider,
-          model: agent.model,
-          system_prompt: agent.systemPrompt,
-          output_schema: agent.outputSchema,
-          strategy: agent.strategy,
-          ci_fail_on: agent.ciFailOn,
-          repo_intel: agent.repoIntel,
+          provider: locked.provider,
+          model: locked.model,
+          system_prompt: locked.systemPrompt,
+          output_schema: locked.outputSchema,
+          strategy: locked.strategy,
+          ci_fail_on: locked.ciFailOn,
+          repo_intel: locked.repoIntel,
           skills: [...links]
             .filter((link) => link.enabled)
             .sort((a, b) => a.order - b.order)
             .map((link) => link.skillId),
         },
       });
+    });
+  }
+
+  /** Add or re-enable one link without replacing the agent's other skills. */
+  async appendSkillLink(agentId: string, skillId: string, tx?: DbTx): Promise<void> {
+    if (!tx) return this.db.transaction((transaction) => this.appendSkillLink(agentId, skillId, transaction));
+
+    const [agent] = await tx.select().from(t.agents).where(eq(t.agents.id, agentId)).for('update');
+    if (!agent) return;
+    const [orderRow] = await tx
+      .select({ maxOrder: max(t.agentSkills.order) })
+      .from(t.agentSkills)
+      .where(eq(t.agentSkills.agentId, agentId));
+    const nextOrder = (orderRow?.maxOrder ?? -1) + 1;
+    await tx
+      .insert(t.agentSkills)
+      .values({ agentId, skillId, enabled: true, order: nextOrder })
+      .onConflictDoUpdate({
+        target: [t.agentSkills.agentId, t.agentSkills.skillId],
+        set: { enabled: true },
+      });
+
+    const links = await tx
+      .select({ skillId: t.agentSkills.skillId, enabled: t.agentSkills.enabled, order: t.agentSkills.order })
+      .from(t.agentSkills)
+      .where(eq(t.agentSkills.agentId, agentId))
+      .orderBy(asc(t.agentSkills.order));
+    const nextVersion = agent.version + 1;
+    await tx.update(t.agents).set({ version: nextVersion }).where(eq(t.agents.id, agentId));
+    await tx.insert(t.agentVersions).values({
+      agentId,
+      version: nextVersion,
+      configJson: {
+        provider: agent.provider,
+        model: agent.model,
+        system_prompt: agent.systemPrompt,
+        output_schema: agent.outputSchema,
+        strategy: agent.strategy,
+        ci_fail_on: agent.ciFailOn,
+        repo_intel: agent.repoIntel,
+        skills: links.filter((link) => link.enabled).map((link) => link.skillId),
+      },
     });
   }
 }

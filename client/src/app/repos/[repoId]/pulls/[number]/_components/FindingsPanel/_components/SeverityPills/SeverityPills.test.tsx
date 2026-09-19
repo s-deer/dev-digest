@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, cleanup, fireEvent } from "@testing-library/react";
+import { render, cleanup, fireEvent, screen } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { Severity } from "@devdigest/shared";
 import messages from "../../../../../../../../../../messages/en/prReview.json";
@@ -17,11 +17,13 @@ function renderPills(counts: Record<Severity, number>, active: Severity | null, 
 
 describe("SeverityPills", () => {
   it("renders only non-zero severities in CRITICAL · WARNING · SUGGESTION order", () => {
-    const { container } = renderPills({ CRITICAL: 1, WARNING: 0, SUGGESTION: 4 }, null);
-    const pills = [...container.querySelectorAll("button")];
-    expect(pills.map((b) => b.dataset.severity)).toEqual(["CRITICAL", "SUGGESTION"]);
-    expect(pills.map((b) => b.textContent)).toEqual(["1 Critical", "4 Suggestion"]);
-    expect(container).toHaveTextContent("·");
+    renderPills({ CRITICAL: 1, WARNING: 0, SUGGESTION: 4 }, null);
+    const pills = screen.getAllByRole("button");
+    expect(pills).toHaveLength(2);
+    expect(pills[0]).toHaveAccessibleName("1 Critical");
+    expect(pills[1]).toHaveAccessibleName("4 Suggestion");
+    expect(screen.queryByRole("button", { name: "0 Warning" })).not.toBeInTheDocument();
+    expect(screen.getByText("·")).toBeInTheDocument();
   });
 
   it("renders nothing when there are no findings", () => {
@@ -31,10 +33,10 @@ describe("SeverityPills", () => {
 
   it("marks the active pill pressed and reports clicks", () => {
     const onToggle = vi.fn();
-    const { container } = renderPills({ CRITICAL: 2, WARNING: 1, SUGGESTION: 0 }, "WARNING", onToggle);
-    const warning = container.querySelector('button[data-severity="WARNING"]')!;
+    renderPills({ CRITICAL: 2, WARNING: 1, SUGGESTION: 0 }, "WARNING", onToggle);
+    const warning = screen.getByRole("button", { name: "1 Warning" });
     expect(warning).toHaveAttribute("aria-pressed", "true");
-    expect(container.querySelector('button[data-severity="CRITICAL"]')).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "2 Critical" })).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(warning);
     expect(onToggle).toHaveBeenCalledWith("WARNING");
   });

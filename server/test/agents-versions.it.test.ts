@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { startPg, dockerAvailable, type PgFixture } from './helpers/pg.js';
 import { buildApp } from '../src/app.js';
 import { loadConfig } from '../src/platform/config.js';
@@ -196,5 +196,47 @@ d('GET /agents/:id/versions', () => {
       .from(t.agentVersions)
       .where(eq(t.agentVersions.agentId, agent.id));
     expect(versions.map((v) => v.version).sort()).toEqual([1, 2, 3]);
+  });
+
+  it('snapshots the complete agent row reloaded inside the transaction', async () => {
+    const { db } = pg.handle;
+    const [ws] = await db.select({ id: t.workspaces.id }).from(t.workspaces);
+    const repo = new AgentsRepository(db);
+    const agent = await repo.insert({
+      workspaceId: ws!.id,
+      name: 'Reloaded snapshot',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      systemPrompt: 'old prompt',
+    });
+
+    await db
+      .update(t.agents)
+      .set({
+        provider: 'anthropic',
+        model: 'claude-sonnet',
+        systemPrompt: 'new prompt',
+        outputSchema: { type: 'object' },
+        strategy: 'map-reduce',
+        ciFailOn: 'any',
+        repoIntel: false,
+      })
+      .where(eq(t.agents.id, agent.id));
+
+    await repo.setSkills(agent, []);
+
+    const [version] = await db
+      .select({ config: t.agentVersions.configJson })
+      .from(t.agentVersions)
+      .where(and(eq(t.agentVersions.agentId, agent.id), eq(t.agentVersions.version, 2)));
+    expect(version?.config).toMatchObject({
+      provider: 'anthropic',
+      model: 'claude-sonnet',
+      system_prompt: 'new prompt',
+      output_schema: { type: 'object' },
+      strategy: 'map-reduce',
+      ci_fail_on: 'any',
+      repo_intel: false,
+    });
   });
 });

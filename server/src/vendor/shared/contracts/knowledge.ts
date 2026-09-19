@@ -130,7 +130,7 @@ export const Skill = z.object({
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
   /** Number of agents this skill is attached to (enabled or not). */
-  agent_count: z.number().int().nonnegative().default(0),
+  agent_count: z.number().int().nonnegative(),
   created_at: z.string(),
   updated_at: z.string(),
 });
@@ -171,23 +171,113 @@ export const CommunitySkill = z.object({
 });
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
 
-// ---- Conventions ----
-export const ConventionCandidate = z.object({
-  id: z.string(),
-  rule: z.string(),
-  evidence_path: z.string(),
-  evidence_snippet: z.string(),
-  confidence: z.number().min(0).max(1),
-  accepted: z.boolean(),
-});
-export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
-
-// ---- Agents ----
 // 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a
-// custom baseURL) — used by the CI runner for cheap models (DeepSeek/GLM/MiniMax).
+// custom baseURL) — used by the CI runner for cheap models.
 export const Provider = z.enum(['openai', 'anthropic', 'openrouter']);
 export type Provider = z.infer<typeof Provider>;
 
+// ---- Conventions ----
+export const ConventionCategory = z.enum([
+  'naming',
+  'structure',
+  'errors',
+  'testing',
+  'imports',
+  'typing',
+  'api',
+  'general',
+]);
+export type ConventionCategory = z.infer<typeof ConventionCategory>;
+
+export const ConventionStatus = z.enum(['pending', 'accepted', 'rejected']);
+export type ConventionStatus = z.infer<typeof ConventionStatus>;
+
+export const ConventionCandidate = z.object({
+  id: z.string(),
+  repo_id: z.string(),
+  scan_id: z.string().nullable(),
+  category: ConventionCategory,
+  rule: z.string(),
+  rationale: z.string().nullable(),
+  evidence_path: z.string(),
+  evidence_line: z.number().int().nullable(),
+  evidence_snippet: z.string(),
+  confidence: z.number().min(0).max(1),
+  status: ConventionStatus,
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type ConventionCandidate = z.infer<typeof ConventionCandidate>;
+
+export const ConventionScanStatus = z.enum(['running', 'done', 'failed']);
+export type ConventionScanStatus = z.infer<typeof ConventionScanStatus>;
+
+export const ConventionScan = z.object({
+  id: z.string(),
+  repo_id: z.string(),
+  status: ConventionScanStatus,
+  provider: Provider,
+  model: z.string(),
+  sampled_files: z.array(z.string()),
+  proposed: z.number().int(),
+  kept: z.number().int(),
+  dropped_ungrounded: z.number().int(),
+  dropped_duplicate: z.number().int(),
+  cost_usd: z.number().nullable(),
+  error: z.string().nullable(),
+  started_at: z.string(),
+  finished_at: z.string().nullable(),
+});
+export type ConventionScan = z.infer<typeof ConventionScan>;
+
+export const ConventionsState = z.object({
+  last_scan: ConventionScan.nullable(),
+  candidates: z.array(ConventionCandidate),
+  counts: z.object({
+    pending: z.number().int().nonnegative(),
+    accepted: z.number().int().nonnegative(),
+    rejected: z.number().int().nonnegative(),
+  }),
+});
+export type ConventionsState = z.infer<typeof ConventionsState>;
+
+export const ConventionExtractResult = z.object({
+  scan: ConventionScan,
+  state: ConventionsState,
+});
+export type ConventionExtractResult = z.infer<typeof ConventionExtractResult>;
+
+export const UpdateConventionBody = z
+  .object({
+    status: ConventionStatus.optional(),
+    rule: z.string().trim().min(3).max(300).optional(),
+    rationale: z.string().trim().max(500).nullable().optional(),
+    category: ConventionCategory.optional(),
+  })
+  .refine((body) => Object.keys(body).length > 0, 'At least one field is required');
+
+export type UpdateConventionBody = z.infer<typeof UpdateConventionBody>;
+
+export const ConventionSkillDraft = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().min(1).max(2_000),
+  type: SkillType,
+  enabled: z.boolean(),
+  body: z.string().trim().min(1).max(100_000),
+  convention_ids: z.array(z.string().uuid()),
+  evidence_files: z.array(z.string()),
+  existing_skill: z
+    .object({ id: z.string().uuid(), version: z.number().int().positive() })
+    .nullable(),
+});
+export type ConventionSkillDraft = z.infer<typeof ConventionSkillDraft>;
+
+export const CreateConventionSkillBody = ConventionSkillDraft.omit({ existing_skill: true }).extend({
+  agent_id: z.string().uuid(),
+});
+export type CreateConventionSkillBody = z.infer<typeof CreateConventionSkillBody>;
+
+// ---- Agents ----
 // Review execution strategy (matches @devdigest/reviewer-core's ReviewStrategy):
 //  - single-pass: send the WHOLE diff in ONE model call (default)
 //  - map-reduce:  one model call PER changed file (for very large diffs)
@@ -220,7 +310,7 @@ export const Agent = z.object({
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
   /** Number of skills attached to this agent (enabled or not). */
-  skill_count: z.number().int().nonnegative().default(0),
+  skill_count: z.number().int().nonnegative(),
 });
 export type Agent = z.infer<typeof Agent>;
 

@@ -119,7 +119,9 @@ export async function reviewsForPull(
           .from(t.agentRuns)
           .where(inArray(t.agentRuns.id, runIds))
       : [];
-  const runById = new Map(runs.map(({ id, ...usage }) => [id, usage]));
+  const runById = new Map(
+    runs.map(({ id, costUsd, ...usage }) => [id, { ...usage, costUsd: costUsd == null ? null : Number(costUsd) }]),
+  );
   return reviews.map((review) => ({
     review,
     findings: findings.filter((f) => f.reviewId === review.id),

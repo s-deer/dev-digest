@@ -17,6 +17,7 @@ import { Container, type ContainerOverrides } from './platform/container.js';
 import { AppError } from './platform/errors.js';
 import { modules } from './modules/index.js';
 import { ReviewService } from './modules/reviews/service.js';
+import { ConventionsRepository } from './modules/conventions/repository.js';
 
 // Attach the DI container to every request/instance.
 declare module 'fastify' {
@@ -47,6 +48,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     // Explicit 1MB cap on request bodies (PR comments, settings payloads are
     // small). Protects against oversized/abusive payloads.
     bodyLimit: 1_048_576,
+    requestTimeout: 150_000,
     logger:
       config.logLevel === 'silent'
         ? false
@@ -82,6 +84,12 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     if (reaped > 0) app.log.info({ reaped }, 'reaped stale running agent_runs on boot');
   } catch (err) {
     app.log.warn({ err: (err as Error).message }, 'stale-run reaping failed (non-fatal)');
+  }
+  try {
+    const reaped = await new ConventionsRepository(db).reapStaleScans();
+    if (reaped > 0) app.log.info({ reaped }, 'reaped stale running convention scans on boot');
+  } catch (err) {
+    app.log.warn({ err: (err as Error).message }, 'stale-convention-scan reaping failed (non-fatal)');
   }
 
   // Security headers (X-Content-Type-Options, X-Frame-Options, …). The API

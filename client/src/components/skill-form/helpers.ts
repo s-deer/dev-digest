@@ -1,5 +1,5 @@
 import type { Skill, SkillType } from "@devdigest/shared";
-import { SKILL_LIMITS } from "../constants";
+import { SKILL_LIMITS } from "./constants";
 
 export interface SkillDraft {
   name: string;
@@ -14,7 +14,6 @@ export function toDraft(skill: Pick<Skill, "name" | "description" | "type" | "bo
   return { name: skill.name, description: skill.description, type: skill.type, body: skill.body };
 }
 
-/** Same rules the server enforces: all fields required after trimming, within the limits. */
 export function isDraftValid(draft: SkillDraft): boolean {
   const name = draft.name.trim();
   const description = draft.description.trim();

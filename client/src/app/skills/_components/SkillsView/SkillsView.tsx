@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button, Dropdown, EmptyState, ErrorState, Icon, Skeleton } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
-import { AppShell } from "../../../../components/app-shell";
 import { useSkills, useUpdateSkill } from "../../../../lib/hooks/skills";
 import { DeleteSkillModal } from "../DeleteSkillModal";
 import { ImportSkillModal } from "../ImportSkillModal";
@@ -38,7 +37,7 @@ export function SkillsView() {
   const create = () => setDialog({ kind: "form", mode: { kind: "create" } });
 
   return (
-    <AppShell crumb={[{ label: t("page.crumbLab") }, { label: t("page.crumbSkills") }]}>
+    <>
       {dialog?.kind === "form" && <SkillFormModal mode={dialog.mode} onClose={close} />}
       {dialog?.kind === "import" && (
         <ImportSkillModal
@@ -123,6 +122,6 @@ export function SkillsView() {
           </div>
         )}
       </div>
-    </AppShell>
+    </>
   );
 }

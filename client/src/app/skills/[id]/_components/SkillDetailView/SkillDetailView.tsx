@@ -3,42 +3,41 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Badge, EmptyState, ErrorState, Icon, Skeleton, Tabs } from "@devdigest/ui";
-import { AppShell } from "../../../../../components/app-shell";
+import type { Skill } from "@devdigest/shared";
 import { SkillTypeBadge } from "../../../../../components/skill-type-badge";
 import { ApiError } from "../../../../../lib/api";
-import { useSkill } from "../../../../../lib/hooks/skills";
 import { ConfigTab } from "./_components/ConfigTab";
 import { PreviewTab } from "./_components/PreviewTab";
 import { VersioningTab } from "./_components/VersioningTab";
 import { TABS, type SkillTabKey } from "./constants";
 import { s } from "./styles";
 
-export function SkillDetailView({ id, tab, onTab }: { id: string; tab: SkillTabKey; onTab: (tab: SkillTabKey) => void }) {
+type SkillDetailViewProps = {
+  skill: Skill | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  error: unknown;
+  refetch: () => unknown;
+  tab: SkillTabKey;
+  onTab: (tab: SkillTabKey) => void;
+};
+
+export function SkillDetailView({ skill, isLoading, isError, error, refetch, tab, onTab }: SkillDetailViewProps) {
   const t = useTranslations("skills");
-  const { data: skill, isLoading, isError, error, refetch } = useSkill(id);
-  const crumb = [
-    { label: t("page.crumbLab") },
-    { label: t("page.crumbSkills"), href: "/skills" },
-    { label: skill?.name ?? "…" },
-  ];
 
   if (isError && error instanceof ApiError && error.status === 404) {
     return (
-      <AppShell crumb={crumb}>
-        <EmptyState icon="Sparkles" title={t("detail.notFound.title")} body={t("detail.notFound.body")} />
-      </AppShell>
+      <EmptyState icon="Sparkles" title={t("detail.notFound.title")} body={t("detail.notFound.body")} />
     );
   }
   if (isError) {
     return (
-      <AppShell crumb={crumb}>
-        <ErrorState fullScreen body={t("detail.loadError")} onRetry={() => refetch()} />
-      </AppShell>
+      <ErrorState fullScreen body={t("detail.loadError")} onRetry={() => refetch()} />
     );
   }
 
   return (
-    <AppShell crumb={crumb}>
+    <>
       {isLoading || !skill ? (
         <div style={s.loading}>
           <Skeleton height={24} width={240} />
@@ -75,6 +74,6 @@ export function SkillDetailView({ id, tab, onTab }: { id: string; tab: SkillTabK
           </div>
         </div>
       )}
-    </AppShell>
+    </>
   );
 }

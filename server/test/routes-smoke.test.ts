@@ -64,4 +64,15 @@ describe('routes (no DB)', () => {
     expect(res.json().error.code).toBe('validation_error');
     await app.close();
   });
+
+  it('rejects malformed base64 lengths at the request boundary', async () => {
+    const app = await buildApp({ config });
+    const res = await app.inject({
+      method: 'POST',
+      url: '/skills/import-preview',
+      payload: { filename: 'skill.md', content_base64: 'A' },
+    });
+    expect(res.statusCode).toBe(422);
+    await app.close();
+  });
 });

@@ -8,7 +8,7 @@ import type { Skill } from "@devdigest/shared";
 import { useUpdateSkill } from "../../../../../../../lib/hooks/skills";
 import { useToast } from "../../../../../../../lib/toast";
 import { DeleteSkillModal } from "../../../../../_components/DeleteSkillModal";
-import { SkillForm, isDraftDirty, isDraftValid, toDraft, type SkillDraft } from "../../../../../_components/SkillForm";
+import { SkillForm, isDraftDirty, isDraftValid, toDraft, type SkillDraft } from "@/components/skill-form";
 import { s } from "./styles";
 
 /** Edit metadata + body; a changed body is saved as the next immutable version. */
