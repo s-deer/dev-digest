@@ -49,3 +49,5 @@ pnpm db:seed                                # idempotent demo data
   map.
 - Read `../TESTING.md` before adding a test or changing the unit/integration
   split.
+- Use the `onion-architecture` skill when adding or changing a module, route,
+  service, repository, or adapter.
