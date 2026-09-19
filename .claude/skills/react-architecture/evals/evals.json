@@ -1,0 +1,55 @@
+{
+  "skill_name": "react-architecture",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Я додаю в DevDigest client нову сторінку 'Compare runs' під repos/[repoId]/pulls/[number]/compare. Там буде таблиця з двома ранами поруч, дифф findings між ними, хелпер що рахує дельту severity між двома ранами, і константа максимальної кількості ранів для порівняння (4). Дані — новий ендпоінт GET /repos/:id/pulls/:n/runs/compare. Куди покласти кожен файл? Дай мені дерево з реальними шляхами і коротко чому.",
+      "expected_output": "A file tree under client/src/app/repos/[repoId]/pulls/[number]/compare/ with a thin page.tsx, a _components/<Name>View/ folder holding constants.ts (MAX), helpers.ts (severity delta), and nested _components for the table and diff; the data hook added to src/lib/hooks/<domain>.ts over api.ts; contract types in @devdigest/shared first; strings in messages/en/*.json.",
+      "files": [],
+      "assertions": [
+        "Places the page at client/src/app/repos/[repoId]/pulls/[number]/compare/page.tsx and keeps it thin (renders a view component)",
+        "Puts route-specific UI under a _components/<Name>/ folder next to the compare route (not in src/components)",
+        "Puts the severity-delta helper colocated in the feature (a helpers.ts in the component/route folder), not in a global utils/ or helpers/ folder",
+        "Puts the max-runs constant (4) in a colocated constants.ts, not in a global constants file",
+        "Adds the data hook to a src/lib/hooks/<domain>.ts file built on src/lib/api.ts (component does not call fetch)",
+        "Says the response contract/types go into @devdigest/shared first (not redeclared in client)",
+        "Mentions user-facing strings go to messages/en/*.json via next-intl",
+        "Mentions colocated *.test.tsx and/or a test for the pure helper"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Here's a component from our Next.js client (evals/files/AgentRunsPanel.tsx in the react-architecture skill folder). It's gotten messy. Split it properly — show me the resulting files and their contents. Keep behavior the same.",
+      "expected_output": "Resulting folder with AgentRunsPanel.tsx (thin view), helpers.ts (pure filter/sort/risk/timeAgo/cost formatting), constants.ts (PAGE_SIZE, SEVERITY_WEIGHT at module scope), styles.ts, child components in _components/, data access moved to a hook in src/lib/hooks (useAgentRuns + rerun mutation over api.ts), no useEffect-derived state, no direct fetch in the component.",
+      "files": [
+        "evals/files/AgentRunsPanel.tsx"
+      ],
+      "assertions": [
+        "No fetch() call remains in any component file; data access moved to a hook in src/lib/hooks (or equivalent data module) using the api.ts client",
+        "The derived list/totalCost are computed during render (no useEffect + setState for derived values)",
+        "Server data is not mirrored into useState (uses a TanStack Query hook's data)",
+        "PAGE_SIZE and SEVERITY_WEIGHT are moved out of the component body to module scope / constants.ts",
+        "Pure logic (filter/sort, risk score, time-ago, cost formatting) extracted into a helpers.ts (or similar pure module) with no React import",
+        "Row UI extracted into at least one child component under a nested _components/ folder",
+        "Inline styles moved to a colocated styles.ts following the repo's `s` object convention",
+        "Rerun is implemented as a mutation that invalidates/refetches the runs query instead of manual refetch into state"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "We're starting a separate Next.js 15 App Router app (not DevDigest) with Postgres via Drizzle. I need an 'archive agent' button on /agents/[id]. Where should the Server Action live, where does the DB access go, and how do I make sure the DB client and secrets never end up in the client bundle? Show the folder layout and the key files.",
+      "expected_output": "Layout with a thin page.tsx Server Component, a 'use client' leaf button, a colocated actions.ts ('use server') that validates input, calls a DAL function and revalidates; a DAL module (src/server or src/data) starting with import 'server-only' that does authz and returns DTOs; DB client also server-only; explanation of the 'use client' module-graph boundary.",
+      "files": [],
+      "assertions": [
+        "Server Action file ('use server') is colocated with the agents feature/route (e.g. app/agents/[id]/_lib/actions.ts or features/agents/actions.ts), not a global actions/ folder",
+        "DB access goes through a dedicated data access layer module (DAL) that pages/actions call, not direct db calls in the action/page",
+        "DAL and DB client modules use `import 'server-only'`",
+        "Authorization check happens in the DAL (or explicitly re-checked in the action), noting Server Actions are public endpoints",
+        "Action validates input (e.g. Zod) and revalidates (revalidatePath/revalidateTag)",
+        "The archive button is a small 'use client' leaf while the page stays a Server Component",
+        "Explains that 'use client' makes all imports part of the client bundle / module-graph boundary",
+        "DAL returns a minimal DTO rather than raw DB rows"
+      ]
+    }
+  ]
+}
