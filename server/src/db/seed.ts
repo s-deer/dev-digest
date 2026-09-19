@@ -6,6 +6,8 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
+  API_CONTRACT_REVIEWER_PROMPT,
 } from './seed-prompts.js';
 
 /** Default provider/model for the built-in reviewer agents. */
@@ -204,8 +206,13 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.skills)
       .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, skill.name)));
     if (!existing) {
-      const [created] = await db.insert(t.skills).values(skill).returning();
-      await db.insert(t.skillVersions).values({ skillId: created!.id, version: 1, body: created!.body });
+      // One transaction: a skill without its v1 snapshot is skipped by re-runs.
+      await db.transaction(async (tx) => {
+        const [created] = await tx.insert(t.skills).values(skill).returning();
+        await tx
+          .insert(t.skillVersions)
+          .values({ skillId: created!.id, version: 1, body: created!.body, note: 'Seeded demo skill' });
+      });
     }
   }
 
@@ -251,7 +258,7 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       description: 'Checks tests for missing branches, corner cases, brittle mocks, and flakes.',
       provider: DEFAULT_PROVIDER,
       model: DEFAULT_MODEL,
-      systemPrompt: GENERAL_REVIEWER_PROMPT,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
       enabled: true,
       version: 1,
       createdBy: userId,
@@ -262,7 +269,7 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       description: 'Detects breaking route and payload contract changes.',
       provider: DEFAULT_PROVIDER,
       model: DEFAULT_MODEL,
-      systemPrompt: GENERAL_REVIEWER_PROMPT,
+      systemPrompt: API_CONTRACT_REVIEWER_PROMPT,
       enabled: true,
       version: 1,
       createdBy: userId,
@@ -276,34 +283,9 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     if (!existing) await db.insert(t.agents).values(a);
   }
 
-  const [testSkill] = await db
-    .select({ id: t.skills.id })
-    .from(t.skills)
-    .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, 'Test Quality Rubric')));
-  const [contractSkill] = await db
-    .select({ id: t.skills.id })
-    .from(t.skills)
-    .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, 'API Contract Compatibility')));
-  const [testAgent] = await db
-    .select({ id: t.agents.id })
-    .from(t.agents)
-    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'Test Quality Reviewer')));
-  const [contractAgent] = await db
-    .select({ id: t.agents.id })
-    .from(t.agents)
-    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'API Contract Reviewer')));
-  if (testSkill && testAgent) {
-    await db
-      .insert(t.agentSkills)
-      .values({ agentId: testAgent.id, skillId: testSkill.id, enabled: true, order: 0 })
-      .onConflictDoNothing();
-  }
-  if (contractSkill && contractAgent) {
-    await db
-      .insert(t.agentSkills)
-      .values({ agentId: contractAgent.id, skillId: contractSkill.id, enabled: true, order: 0 })
-      .onConflictDoNothing();
-  }
+  // The demo skills stay UNATTACHED: the Test Quality / API Contract agents get
+  // their skills through the UI (create or import), and a run without skills is
+  // the control case of the skills experiment.
 
   return { workspaceId, userId };
 }

@@ -115,7 +115,8 @@ export type MemoryItem = z.infer<typeof MemoryItem>;
 export const SkillType = z.enum(['rubric', 'convention', 'security', 'custom']);
 export type SkillType = z.infer<typeof SkillType>;
 
-export const SkillSource = z.enum(['manual', 'imported_url', 'extracted', 'community']);
+// imported_file = uploaded .md/.zip (only the Markdown core is kept); imported_url is reserved.
+export const SkillSource = z.enum(['manual', 'imported_file', 'imported_url', 'extracted', 'community']);
 export type SkillSource = z.infer<typeof SkillSource>;
 
 export const Skill = z.object({
@@ -128,13 +129,36 @@ export const Skill = z.object({
   enabled: z.boolean(),
   version: z.number().int(),
   evidence_files: z.array(z.string()).nullish(),
+  /** Number of agents this skill is attached to (enabled or not). */
+  agent_count: z.number().int().nonnegative().default(0),
+  created_at: z.string(),
+  updated_at: z.string(),
 });
 export type Skill = z.infer<typeof Skill>;
 
-/** A Markdown import is parsed for preview before the user creates a skill. */
+/** An immutable body snapshot; every body change appends one. */
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  body: z.string(),
+  note: z.string().nullable(),
+  created_at: z.string(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+/**
+ * An uploaded .md or .zip is parsed for preview before the user creates a
+ * skill. Only the Markdown core is extracted; every other archive entry is
+ * listed in `ignored_files` and never executed, stored, or sent to a model.
+ */
 export const SkillImportPreview = z.object({
   name: z.string(),
+  description: z.string(),
+  type: SkillType,
   body: z.string(),
+  source_file: z.string(),
+  ignored_files: z.array(z.string()),
+  warnings: z.array(z.string()),
 });
 export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
 
@@ -189,6 +213,8 @@ export const Agent = z.object({
   // Inject repo-intel context (repo skeleton + callers + rank note) into this
   // agent's review prompt. Default on; gated again by the global flag.
   repo_intel: z.boolean().default(true),
+  /** Number of skills attached to this agent (enabled or not). */
+  skill_count: z.number().int().nonnegative().default(0),
 });
 export type Agent = z.infer<typeof Agent>;
 

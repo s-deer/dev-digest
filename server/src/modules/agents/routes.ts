@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
-import { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
+import { Agent, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { NotFoundError } from '../../platform/errors.js';
@@ -58,13 +58,15 @@ const UpdateAgentBody = z.object({
 
 const SetSkillsBody = z
   .object({
-    links: z.array(
-      z.object({
-        skill_id: z.string().uuid(),
-        enabled: z.boolean(),
-        order: z.number().int().nonnegative(),
-      }),
-    ),
+    links: z
+      .array(
+        z.object({
+          skill_id: z.string().uuid(),
+          enabled: z.boolean(),
+          order: z.number().int().nonnegative(),
+        }),
+      )
+      .max(200),
   })
   .superRefine((body, ctx) => {
     const ids = new Set<string>();
@@ -85,12 +87,12 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const service = new AgentsService(app.container);
 
-  app.get('/agents', async (req) => {
+  app.get('/agents', { schema: { response: { 200: z.array(Agent) } } }, async (req) => {
     const { workspaceId } = await getContext(app.container, req);
     return service.list(workspaceId);
   });
 
-  app.get('/agents/:id', { schema: { params: IdParams } }, async (req) => {
+  app.get('/agents/:id', { schema: { params: IdParams, response: { 200: Agent } } }, async (req) => {
     const { workspaceId } = await getContext(app.container, req);
     const agent = await service.get(workspaceId, req.params.id);
     if (!agent) throw new NotFoundError('Agent not found');

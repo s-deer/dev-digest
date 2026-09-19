@@ -268,9 +268,56 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
     const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
 
-    expect(trace.prompt_assembly.skills).toBe('# First skill');
+    expect(trace.prompt_assembly.skills).toBe('### Skill: First (v1)\n# First skill');
+    expect(trace.prompt_assembly.skill_blocks.map((b: { name: string }) => b.name)).toEqual(['First']);
+    expect(trace.prompt_assembly.skills_tokens).toBe(trace.prompt_assembly.skill_blocks[0].tokens);
     expect(trace.prompt_assembly.skills_tokens).toBeGreaterThan(0);
     expect(trace.log.some((line: { msg: string }) => line.msg.includes('skills: 1 enabled skill(s) attached'))).toBe(true);
+    expect(trace.log.some((line: { msg: string }) => line.msg.includes('skill[0]: First v1'))).toBe(true);
+    await app.close();
+  });
+
+  it('injects skill blocks in the attachment order, so reordering reorders the prompt', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Order runner', provider: 'openai', model: 'gpt-4.1', system_prompt: 'review' },
+      })
+    ).json();
+    const make = async (name: string) =>
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/skills',
+          payload: { name, description: `${name} rule.`, type: 'rubric', body: `# ${name}` },
+        })
+      ).json();
+    const alpha = await make('Alpha');
+    const beta = await make('Beta');
+
+    const blockNames = async (links: { skill_id: string; enabled: boolean; order: number }[]) => {
+      await app.inject({ method: 'POST', url: `/agents/${agent.id}/skills`, payload: { links } });
+      const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+      const queued = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+      await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+      const trace = (await app.inject({ method: 'GET', url: `/runs/${queued.json().runs[0].run_id}/trace` })).json();
+      return trace.prompt_assembly.skill_blocks.map((b: { name: string }) => b.name);
+    };
+
+    expect(
+      await blockNames([
+        { skill_id: alpha.id, enabled: true, order: 0 },
+        { skill_id: beta.id, enabled: true, order: 1 },
+      ]),
+    ).toEqual(['Alpha', 'Beta']);
+    expect(
+      await blockNames([
+        { skill_id: beta.id, enabled: true, order: 0 },
+        { skill_id: alpha.id, enabled: true, order: 1 },
+      ]),
+    ).toEqual(['Beta', 'Alpha']);
     await app.close();
   });
 

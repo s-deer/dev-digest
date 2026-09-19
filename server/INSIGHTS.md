@@ -32,3 +32,9 @@ re-discovered the hard way.
 - **Insight:** The two vendored copies are not identical: `diff -rq` shows `adapters.ts`, `contracts/{trace,eval-ci,knowledge,productionize}.ts` differ. If you copy a whole file from server over client, you silently pull in (or revert) unrelated changes.
 - **Do:** ALWAYS port only the targeted diff of your contract change into the client copy. NEVER overwrite whole files. Run `diff -rq server/src/vendor/shared client/src/vendor/shared` before and after.
 - **Evidence:** `diff -rq server/src/vendor/shared client/src/vendor/shared` (5 files differ, 2026-09-15)
+
+### 2026-09-19 · `pnpm typecheck` does not type-check `server/test/**`
+- **Context:** changing a `@devdigest/reviewer-core` or `@devdigest/shared` signature that tests also call.
+- **Insight:** `server/tsconfig.json` includes only `src/**/*.ts`, so a test still passing the old shape (e.g. `skills: string[]` to `assemblePrompt`) compiles cleanly and fails only at vitest runtime with an unrelated-looking `TypeError: Cannot read properties of undefined (reading 'trim')`.
+- **Do:** After a signature change, run `pnpm exec vitest run --exclude '**/*.it.test.ts'` too (and `grep -rn <symbol> server/test`), not just `pnpm typecheck`.
+- **Evidence:** `server/tsconfig.json:28`; `server/test/prompt-callers.test.ts`, `server/test/prompt-structured.test.ts`.

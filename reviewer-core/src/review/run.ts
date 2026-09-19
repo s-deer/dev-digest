@@ -2,6 +2,7 @@ import type {
   Finding,
   LLMProvider,
   PromptAssembly,
+  PromptSkillBlock,
   Review,
   RunEventKind,
   UnifiedDiff,
@@ -52,10 +53,8 @@ export interface ReviewInput {
   llm: LLMProvider;
   /** 'auto' (default) picks single-pass unless the diff is large + multi-file. */
   strategy?: ReviewStrategy;
-  /** Resolved skill bodies (NOT slugs). */
-  skills?: string[];
-  /** Server-calculated token contribution of the resolved skill bodies. */
-  skillTokens?: number;
+  /** Resolved, enabled skills in prompt order (bodies, NOT slugs). */
+  skills?: PromptSkillBlock[];
   /** Curated memory items. */
   memory?: string[];
   /** Project-context spec chunks (untrusted; delimiter-wrapped downstream). */
@@ -132,7 +131,6 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   const promptParts = {
     system: input.systemPrompt,
     skills: input.skills,
-    skillTokens: input.skillTokens,
     memory: input.memory,
     specs: input.specs,
     callers: input.callers,

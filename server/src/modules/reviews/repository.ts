@@ -1,6 +1,6 @@
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { Finding, Intent, RunSummary, RunTrace } from '@devdigest/shared';
+import type { Finding, FindingsSummary, Intent, RunSummary, RunTrace } from '@devdigest/shared';
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -66,6 +66,11 @@ export class ReviewRepository {
     return reviewRepo.reviewsForPull(this.db, prId);
   }
 
+  /** Findings rollup per review id (PR list FINDINGS column). */
+  findingsSummaryForReviews(reviewIds: string[]): Promise<Map<string, FindingsSummary>> {
+    return reviewRepo.findingsSummaryForReviews(this.db, reviewIds);
+  }
+
   getReview(reviewId: string): Promise<ReviewRow | undefined> {
     return reviewRepo.getReview(this.db, reviewId);
   }
@@ -82,6 +87,13 @@ export class ReviewRepository {
   /** All runs for a PR (any status), newest first — the PR run history. */
   listRunsForPull(workspaceId: string, prId: string): Promise<RunSummary[]> {
     return runRepo.listRunsForPull(this.db, workspaceId, prId);
+  }
+
+  /** Cost of every completed run on the given PRs (PR list COST column). */
+  doneRunCostsForPulls(
+    prIds: string[],
+  ): Promise<{ prId: string | null; costUsd: number | null }[]> {
+    return runRepo.doneRunCostsForPulls(this.db, prIds);
   }
 
   /** Delete one agent run (+ its trace via FK cascade). Workspace-scoped. */

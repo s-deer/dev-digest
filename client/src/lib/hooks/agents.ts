@@ -109,10 +109,26 @@ export function useSetAgentSkillLinks() {
   return useMutation({
     mutationFn: ({ agentId, links }: { agentId: string; links: AgentSkillAttachment[] }) =>
       api.post<AgentSkillLink[]>(`/agents/${agentId}/skills`, { links }),
+    // Optimistic so drag & drop and toggles don't snap back while saving.
+    onMutate: async ({ agentId, links }) => {
+      const key = ["agent-skills", agentId];
+      await queryClient.cancelQueries({ queryKey: key });
+      const previous = queryClient.getQueryData<AgentSkillLink[]>(key);
+      queryClient.setQueryData<AgentSkillLink[]>(
+        key,
+        links.map((link) => ({ agent_id: agentId, ...link })),
+      );
+      return { previous };
+    },
+    onError: (_error, { agentId }, context) => {
+      queryClient.setQueryData(["agent-skills", agentId], context?.previous);
+    },
     onSuccess: (links, { agentId }) => {
       queryClient.setQueryData(["agent-skills", agentId], links);
       queryClient.invalidateQueries({ queryKey: ["agents"] });
       queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
+      // agent_count on skill cards changes with attachments.
+      queryClient.invalidateQueries({ queryKey: ["skills"] });
     },
   });
 }

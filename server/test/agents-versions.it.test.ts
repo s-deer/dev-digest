@@ -175,4 +175,26 @@ d('GET /agents/:id/versions', () => {
     expect(await service.listVersions(defaultWs!, foreign.id)).toBeUndefined();
     expect(await service.getVersion(defaultWs!, foreign.id, 1)).toBeUndefined();
   });
+
+  it('concurrent attachment saves each append a distinct version (no PK collision)', async () => {
+    const { db } = pg.handle;
+    const [ws] = await db.select({ id: t.workspaces.id }).from(t.workspaces);
+    const repo = new AgentsRepository(db);
+    const agent = await repo.insert({
+      workspaceId: ws!.id,
+      name: 'Racy',
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      systemPrompt: 'x',
+    });
+    // Both callers hold the same stale `agent` row (version 1), as the service does
+    // when two requests arrive together.
+    await Promise.all([repo.setSkills(agent, []), repo.setSkills(agent, [])]);
+
+    const versions = await db
+      .select({ version: t.agentVersions.version })
+      .from(t.agentVersions)
+      .where(eq(t.agentVersions.agentId, agent.id));
+    expect(versions.map((v) => v.version).sort()).toEqual([1, 2, 3]);
+  });
 });

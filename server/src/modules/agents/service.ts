@@ -59,12 +59,15 @@ export class AgentsService {
 
   async list(workspaceId: string): Promise<Agent[]> {
     const rows = await this.repo.list(workspaceId);
-    return rows.map(toAgentDto);
+    const counts = await this.repo.skillCounts(rows.map((row) => row.id));
+    return rows.map((row) => toAgentDto(row, counts.get(row.id) ?? 0));
   }
 
   async get(workspaceId: string, id: string): Promise<Agent | undefined> {
     const row = await this.repo.getById(workspaceId, id);
-    return row ? toAgentDto(row) : undefined;
+    if (!row) return undefined;
+    const counts = await this.repo.skillCounts([row.id]);
+    return toAgentDto(row, counts.get(row.id) ?? 0);
   }
 
   /** Delete an agent (and its versions/skill-links, via cascade). */
@@ -107,7 +110,7 @@ export class AgentsService {
       ...(patch.repo_intel !== undefined ? { repoIntel: patch.repo_intel } : {}),
       ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
     });
-    return row ? toAgentDto(row) : undefined;
+    return row ? this.get(workspaceId, id) : undefined;
   }
 
   /**

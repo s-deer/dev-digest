@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup, fireEvent, act } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, waitForElementToBeRemoved } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingsSummary } from "@devdigest/shared";
 import common from "../../../messages/en/common.json";
@@ -55,8 +55,7 @@ describe("FindingsBadges", () => {
     expect(trigger).toHaveAttribute("aria-describedby", tooltip.id);
 
     fireEvent.mouseLeave(trigger);
-    await act(() => new Promise((r) => setTimeout(r, 200)));
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await waitForElementToBeRemoved(() => screen.queryByRole("tooltip"));
   });
 
   it("opens on keyboard focus and closes on Escape", () => {

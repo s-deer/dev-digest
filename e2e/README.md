@@ -100,4 +100,5 @@ a CI artifact by `.github/workflows/e2e-web.yml`).
 | `05-pr-diff` | PR #482 → Files changed tab → seeded file renders in the diff viewer |
 | `06-onboarding` | `/onboarding` → add-repository form renders (no submit) |
 | `07-settings` | `/settings/api-keys` + `/settings/models` → section titles render |
-| `08-skills` | `/skills` → seeded reusable skills render |
+| `08-skills` | `/skills` → card → side preview → Open → `/skills/:id` Preview + Versioning tabs (read-only) |
+| `09-agent-skills-tab` | Test Quality Reviewer → Skills tab lists every workspace skill (read-only) |

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -195,6 +195,18 @@ export class AgentsRepository {
 
   // ---- agent_skills link table (A2 owns the agent side) -------------------
 
+  /** Attached-skill count per agent id (enabled or not); agents without links are absent.
+   *  NOT workspace-scoped: callers pass ids from an already workspace-scoped agent list. */
+  async skillCounts(agentIds: string[]): Promise<Map<string, number>> {
+    if (agentIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ agentId: t.agentSkills.agentId, n: count() })
+      .from(t.agentSkills)
+      .where(inArray(t.agentSkills.agentId, agentIds))
+      .groupBy(t.agentSkills.agentId);
+    return new Map(rows.map((row) => [row.agentId, row.n]));
+  }
+
   /** Skills linked to an agent, in `order` ascending. */
   async linkedSkills(agentId: string): Promise<LinkedSkillRow[]> {
     const rows = await this.db
@@ -226,8 +238,16 @@ export class AgentsRepository {
    * prompt, so it creates the next immutable agent configuration snapshot.
    */
   async setSkills(agent: AgentRow, links: SkillLinkInput[]): Promise<void> {
-    const nextVersion = agent.version + 1;
     await this.db.transaction(async (tx) => {
+      // Lock the agent row and derive the next version inside the transaction:
+      // `agent.version` was read before it opened, so two concurrent saves would
+      // otherwise both insert the same (agent_id, version) primary key.
+      const [locked] = await tx
+        .select({ version: t.agents.version })
+        .from(t.agents)
+        .where(eq(t.agents.id, agent.id))
+        .for('update');
+      const nextVersion = (locked?.version ?? agent.version) + 1;
       await tx.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agent.id));
       if (links.length > 0) {
         await tx.insert(t.agentSkills).values(

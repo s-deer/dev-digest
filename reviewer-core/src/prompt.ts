@@ -1,4 +1,4 @@
-import type { ChatMessage, PromptAssembly } from '@devdigest/shared';
+import type { ChatMessage, PromptAssembly, PromptSkillBlock } from '@devdigest/shared';
 
 /**
  * Prompt assembly + prompt-injection hardening.
@@ -39,10 +39,11 @@ const MAX_PR_DESCRIPTION_CHARS = 4000;
 export interface PromptParts {
   /** Agent's system prompt (trusted). */
   system: string;
-  /** Linked skill bodies (trusted-ish; community skills should be sanitized upstream). */
-  skills?: string[];
-  /** Server-calculated token contribution of the linked skill bodies. */
-  skillTokens?: number;
+  /**
+   * Enabled skills in prompt order (trusted-ish: the user reviewed the Markdown
+   * before saving). `tokens` is the caller's count of `renderSkillBlock(block)`.
+   */
+  skills?: PromptSkillBlock[];
   /** Relevant memory items (trusted, curated). */
   memory?: string[];
   /** Project-context spec chunks (untrusted content). */
@@ -80,6 +81,14 @@ export interface AssembledPrompt {
 }
 
 /**
+ * One skill as the model sees it. Exported so callers count tokens over the
+ * exact text that lands in the prompt.
+ */
+export function renderSkillBlock(skill: Pick<PromptSkillBlock, 'name' | 'version' | 'body'>): string {
+  return `### Skill: ${skill.name} (v${skill.version})\n${skill.body.trim()}`;
+}
+
+/**
  * Assemble the messages array + the PromptAssembly record for the run trace.
  * Untrusted blocks (specs, diff) are delimiter-wrapped; the injection guard is
  * appended to the system message.
@@ -87,8 +96,9 @@ export interface AssembledPrompt {
 export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   const system = `${parts.system}\n\n${INJECTION_GUARD}`;
 
+  const skillBlocks = [...(parts.skills ?? [])].sort((a, b) => a.order - b.order);
   const skillsBlock =
-    parts.skills && parts.skills.length > 0 ? parts.skills.join('\n\n') : undefined;
+    skillBlocks.length > 0 ? skillBlocks.map(renderSkillBlock).join('\n\n') : undefined;
   const memoryBlock =
     parts.memory && parts.memory.length > 0
       ? parts.memory.map((m) => `- ${m}`).join('\n')
@@ -131,7 +141,8 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   const assembly: PromptAssembly = {
     system,
     skills: skillsBlock ?? null,
-    skills_tokens: parts.skillTokens ?? 0,
+    skills_tokens: skillBlocks.reduce((sum, block) => sum + block.tokens, 0),
+    skill_blocks: skillBlocks,
     memory: memoryBlock ?? null,
     specs: specsBlock ?? null,
     callers: parts.callers ?? null,

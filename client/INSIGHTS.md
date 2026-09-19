@@ -18,3 +18,9 @@ re-discovered the hard way.
 - **Insight:** `s.tableCard` sets `overflow: "hidden"` to keep the rounded corners. A `position: absolute` popover in a row gets cut off at the card edge, worst on the bottom rows.
 - **Do:** ALWAYS position the popover with `position: fixed`, computed from the trigger's `getBoundingClientRect()` and flipped above in the lower half of the viewport. Reuse `FindingsBadges` / `positionFor` rather than writing a new one.
 - **Evidence:** `client/src/app/repos/[repoId]/pulls/styles.ts:90`, `client/src/components/findings-summary/FindingsBadges.tsx:20`, `client/src/components/findings-summary/styles.ts:19`
+
+### 2026-09-19 · Vendored `<Markdown>` renders headings and lists as plain text unless `.dd-md` block styles exist
+- **Context:** rendering skill bodies, PR descriptions, or any Markdown through `@devdigest/ui` `Markdown`.
+- **Insight:** The primitive only styles inline elements (`p`, `strong`, `code`, `a`); the global reset strips heading sizes and list markers, so the "rendered" view looked like raw text, and inline `code` padding leaked into fenced blocks.
+- **Do:** Keep block styles in `client/src/app/globals.css` under `.dd-md` (the class the primitive already sets); don't edit `src/vendor/ui` or add per-page Markdown CSS.
+- **Evidence:** `client/src/vendor/ui/primitives/Markdown.tsx`, `.dd-md` rules in `client/src/app/globals.css`.

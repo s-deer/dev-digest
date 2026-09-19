@@ -1,7 +1,8 @@
 {
   "card": {
     "noDescription": "No description",
-    "skillCount": "{count} skills"
+    "skillCount": "{count, plural, one {# skill} other {# skills}}",
+    "delete": "Delete {name}"
   },
   "list": {
     "breadcrumbLab": "Skills Lab",
@@ -91,9 +92,7 @@
     "title": "Skills",
     "enabledCount": "{linked} of {total} enabled",
     "filterPlaceholder": "Filter skills…",
-    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Drag to reorder.",
-    "attached": "Attached",
-    "enabled": "Enabled for this agent",
+    "orderHint": "Order matters — enabled skills are injected into the prompt in this order. Drag enabled skills to reorder.",
     "globalDisabled": "Disabled globally",
     "moveUp": "Move up",
     "moveDown": "Move down",
@@ -102,9 +101,20 @@
       "convention": "convention",
       "security": "security",
       "custom": "custom"
-    }
+    },
+    "filterNoReorder": "Clear the filter to reorder skills.",
+    "enableFor": "Enable {name} for this agent",
+    "detach": "Detach {name}",
+    "loadError": "Couldn't load this agent's skills."
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."
+  },
+  "delete": {
+    "title": "Delete agent",
+    "body": "Delete \"{name}\"? Its config history and skill attachments are removed; past review runs are kept. This can't be undone.",
+    "confirm": "Delete",
+    "cancel": "Cancel",
+    "deleted": "Deleted \"{name}\""
   }
 }

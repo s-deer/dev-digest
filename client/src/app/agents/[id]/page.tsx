@@ -9,6 +9,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button, Dropdown, ErrorState, Skeleton, Icon, Badge, TextInput } from "@devdigest/ui";
 import { AppShell } from "../../../components/app-shell";
 import { AgentCard } from "../_components/AgentCard";
+import { filterAgents } from "../_components/AgentsListView/helpers";
 import { AgentEditor } from "./_components/AgentEditor";
 import { useAgents, useAgent, useUpdateAgent } from "../../../lib/hooks/agents";
 import { ApiError } from "../../../lib/api";
@@ -27,9 +28,9 @@ export default function AgentEditorPage() {
   const [query, setQuery] = React.useState("");
 
   const tab = TAB_KEYS.includes(search.get("tab") ?? "") ? search.get("tab")! : "config";
-  const setTab = (t: string) => {
+  const setTab = (nextTab: string) => {
     const sp = new URLSearchParams(search.toString());
-    sp.set("tab", t);
+    sp.set("tab", nextTab);
     router.replace(`/agents/${id}?${sp.toString()}`);
   };
 
@@ -38,9 +39,7 @@ export default function AgentEditorPage() {
     { label: "Agents", href: "/agents" },
     { label: agent?.name ?? "Agent" },
   ];
-  const visibleAgents = (agents ?? []).filter((candidate) =>
-    `${candidate.name} ${candidate.description}`.toLowerCase().includes(query.toLowerCase()),
-  );
+  const visibleAgents = filterAgents(agents ?? [], query);
 
   if (isError || (!isLoading && !agent)) {
     return (

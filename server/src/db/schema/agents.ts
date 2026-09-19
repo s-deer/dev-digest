@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, boolean, jsonb, primaryKey } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, boolean, jsonb, primaryKey, index } from 'drizzle-orm/pg-core';
 import { now } from './_shared';
 import { workspaces, users } from './core';
 import { skills } from './skills';
@@ -62,5 +62,10 @@ export const agentSkills = pgTable(
     enabled: boolean('enabled').notNull().default(true),
     order: integer('order').notNull().default(0),
   },
-  (t) => ({ pk: primaryKey({ columns: [t.agentId, t.skillId] }) }),
+  (t) => ({
+    pk: primaryKey({ columns: [t.agentId, t.skillId] }),
+    // The PK leads with agent_id; skill_id lookups (usage counts, FK cascade on
+    // skill delete) need their own index.
+    skillIdx: index('agent_skills_skill_idx').on(t.skillId),
+  }),
 );

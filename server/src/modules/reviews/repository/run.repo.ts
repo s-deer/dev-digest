@@ -2,11 +2,8 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace } from '@devdigest/shared';
-import {
-  emptyFindingsSummary,
-  findingSummaryColumns,
-  summarizeFindings,
-} from '../findings-summary.js';
+import { emptyFindingsSummary, summarizeFindings } from '../findings-summary.js';
+import { findingSummaryColumns } from './review.repo.js';
 
 // ---- in-flight / history --------------------------------------------------
 
@@ -39,6 +36,19 @@ export async function activeRunsForPull(
     agent_name: r.agentName ?? null,
     ran_at: r.ranAt ? r.ranAt.toISOString() : null,
   }));
+}
+
+/** Cost of every completed run on the given PRs — the PR list folds these into
+ *  its COST column. Callers pass ids from a workspace-scoped PR list. */
+export async function doneRunCostsForPulls(
+  db: Db,
+  prIds: string[],
+): Promise<{ prId: string | null; costUsd: number | null }[]> {
+  if (prIds.length === 0) return [];
+  return db
+    .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
+    .from(t.agentRuns)
+    .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')));
 }
 
 /** All runs for a PR (any status), newest first — the PR run history. */

@@ -156,12 +156,15 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
       });
       return;
     }
-    app.log.error(err);
     const e = err as { statusCode?: number; message?: string };
     const statusCode = e.statusCode && e.statusCode < 500 ? e.statusCode : 500;
+    // Client errors raised by Fastify itself (413 body too large, 400 bad JSON,
+    // 429) are not server faults: log them below error level, with their own code.
+    if (statusCode < 500) app.log.warn(err);
+    else app.log.error(err);
     reply.status(statusCode).send({
       error: {
-        code: 'internal_error',
+        code: statusCode < 500 ? 'request_error' : 'internal_error',
         message: statusCode < 500 ? e.message ?? 'Request failed' : 'Internal error',
       },
     });

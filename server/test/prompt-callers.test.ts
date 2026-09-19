@@ -15,7 +15,7 @@ import { assemblePrompt } from '@devdigest/reviewer-core';
 
 const COMMON = {
   system: 'You are a reviewer.',
-  skills: ['## skill\nDetect X'],
+  skills: [{ skill_id: 's1', name: 'skill', version: 1, order: 0, tokens: 3, body: 'Detect X' }],
   memory: ['Do not flag try/catch around JSON.parse'],
   specs: ['# Security baseline\nNo secrets in code.'],
   diff: '@@ -1 +1 @@\n+stripeKey',

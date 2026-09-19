@@ -85,6 +85,20 @@
       "when": 1789828921187,
       "tag": "0011_slim_bug",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789835946086,
+      "tag": "0012_breezy_rumiko_fujikawa",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789837810206,
+      "tag": "0013_neat_nitro",
+      "breakpoints": true
     }
   ]
 }

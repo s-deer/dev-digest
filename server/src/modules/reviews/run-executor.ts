@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
+import type { PromptSkillBlock, Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import { reviewPullRequest, countBlockers, renderSkillBlock } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -187,16 +187,23 @@ export class ReviewRunExecutor {
       // Skills have no runtime capabilities: the only value that reaches the
       // pure reviewer is the ordered Markdown configuration text. Both gates
       // must be on, so disabling a skill globally or for this agent omits it.
+      // Each block's token count covers exactly the text the engine renders.
       const linkedSkills = await this.agents.linkedSkills(agent.id);
-      const skillBodies = linkedSkills
+      const skillBlocks: PromptSkillBlock[] = linkedSkills
         .filter((link) => link.enabled && link.skill.enabled)
-        .map((link) => link.skill.body);
-      const skillTokens = skillBodies.length > 0 ? this.container.tokenizer.count(skillBodies.join('\n\n')) : 0;
+        .map((link, order) => {
+          const block = { skill_id: link.skill.id, name: link.skill.name, version: link.skill.version, order, body: link.skill.body };
+          return { ...block, tokens: this.container.tokenizer.count(renderSkillBlock(block)) };
+        });
+      const skillTokens = skillBlocks.reduce((sum, block) => sum + block.tokens, 0);
       runLog.info(
-        skillBodies.length > 0
-          ? `skills: ${skillBodies.length} enabled skill(s) attached (+${skillTokens} token(s))`
+        skillBlocks.length > 0
+          ? `skills: ${skillBlocks.length} enabled skill(s) attached (+${skillTokens} token(s))`
           : 'skills: no enabled skills attached',
       );
+      for (const block of skillBlocks) {
+        runLog.info(`skill[${block.order}]: ${block.name} v${block.version} (+${block.tokens} token(s))`);
+      }
 
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
@@ -207,8 +214,7 @@ export class ReviewRunExecutor {
         model: agent.model,
         diff,
         llm,
-        skills: skillBodies,
-        skillTokens,
+        skills: skillBlocks,
         // Per-agent review strategy (configured in the Agent editor); falls back
         // to the studio default. single-pass = whole diff in one call.
         strategy: agent.strategy ?? REVIEW_STRATEGY,
@@ -447,6 +453,7 @@ export class ReviewRunExecutor {
         system: agent.systemPrompt,
         skills: null,
         skills_tokens: 0,
+        skill_blocks: [],
         memory: null,
         specs: null,
         user: '',

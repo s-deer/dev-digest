@@ -1,6 +1,13 @@
-import type { Skill, SkillSource, SkillType } from '@devdigest/shared';
-import { toSkillDto, previewMarkdown } from './helpers.js';
-import { SkillsRepository } from './repository.js';
+import type { Skill, SkillImportPreview, SkillSource, SkillType, SkillVersion } from '@devdigest/shared';
+import { toSkillDto, toSkillVersionDto } from './helpers.js';
+import { parseSkillUpload } from './importer.js';
+import type {
+  InsertSkill,
+  SkillRow,
+  SkillVersionRow,
+  SkillWithUsageRow,
+  UpdateSkill,
+} from './repository.js';
 
 export interface CreateSkillInput {
   name: string;
@@ -9,6 +16,7 @@ export interface CreateSkillInput {
   source: SkillSource;
   body: string;
   enabled?: boolean;
+  version_note?: string;
 }
 
 export interface UpdateSkillInput {
@@ -19,43 +27,79 @@ export interface UpdateSkillInput {
   enabled?: boolean;
 }
 
-/** Application service for skill lifecycle and Markdown preview. */
+export type RestoreResult = { status: 'not_found' } | { status: 'ok'; skill: Skill };
+
+/** Persistence port for `SkillsService` — implemented by `SkillsRepository`. */
+export interface SkillsRepo {
+  list(workspaceId: string): Promise<SkillWithUsageRow[]>;
+  getById(workspaceId: string, id: string): Promise<SkillWithUsageRow | undefined>;
+  insert(values: InsertSkill): Promise<SkillRow>;
+  update(
+    workspaceId: string,
+    id: string,
+    patch: UpdateSkill,
+    versionNote?: string,
+  ): Promise<SkillRow | undefined>;
+  deleteById(workspaceId: string, id: string): Promise<boolean>;
+  listVersions(workspaceId: string, skillId: string): Promise<SkillVersionRow[] | undefined>;
+  getVersion(skillId: string, version: number): Promise<SkillVersionRow | undefined>;
+}
+
+/** Application service for skill lifecycle, version history, and import preview. */
 export class SkillsService {
-  constructor(private repo: SkillsRepository) {}
+  constructor(private repo: SkillsRepo) {}
 
   async list(workspaceId: string): Promise<Skill[]> {
-    return (await this.repo.list(workspaceId)).map(toSkillDto);
+    return (await this.repo.list(workspaceId)).map((row) => toSkillDto(row, row.agentCount));
   }
 
   async get(workspaceId: string, id: string): Promise<Skill | undefined> {
     const row = await this.repo.getById(workspaceId, id);
-    return row ? toSkillDto(row) : undefined;
+    return row ? toSkillDto(row, row.agentCount) : undefined;
   }
 
   async create(workspaceId: string, input: CreateSkillInput): Promise<Skill> {
-    return toSkillDto(
-      await this.repo.insert({
-        workspaceId,
-        name: input.name,
-        description: input.description,
-        type: input.type,
-        source: input.source,
-        body: input.body,
-        enabled: input.enabled,
-      }),
-    );
+    const row = await this.repo.insert({
+      workspaceId,
+      name: input.name,
+      description: input.description,
+      type: input.type,
+      source: input.source,
+      body: input.body,
+      enabled: input.enabled,
+      versionNote: input.version_note,
+    });
+    return toSkillDto(row);
   }
 
   async update(workspaceId: string, id: string, patch: UpdateSkillInput): Promise<Skill | undefined> {
     const row = await this.repo.update(workspaceId, id, patch);
-    return row ? toSkillDto(row) : undefined;
+    return row ? this.get(workspaceId, id) : undefined;
   }
 
   async delete(workspaceId: string, id: string): Promise<boolean> {
     return this.repo.deleteById(workspaceId, id);
   }
 
-  previewImport(markdown: string) {
-    return previewMarkdown(markdown);
+  async listVersions(workspaceId: string, id: string): Promise<SkillVersion[] | undefined> {
+    const rows = await this.repo.listVersions(workspaceId, id);
+    return rows?.map(toSkillVersionDto);
+  }
+
+  /**
+   * Make an old snapshot current again. History is append-only: the restored
+   * body becomes a new version rather than rewinding the counter.
+   */
+  async restore(workspaceId: string, id: string, version: number): Promise<RestoreResult> {
+    const skill = await this.repo.getById(workspaceId, id);
+    if (!skill) return { status: 'not_found' };
+    const snapshot = await this.repo.getVersion(id, version);
+    if (!snapshot) return { status: 'not_found' };
+    await this.repo.update(workspaceId, id, { body: snapshot.body }, `Restored from v${version}`);
+    return { status: 'ok', skill: (await this.get(workspaceId, id))! };
+  }
+
+  previewImport(filename: string, contentBase64: string): SkillImportPreview {
+    return parseSkillUpload(filename, Buffer.from(contentBase64, 'base64'));
   }
 }

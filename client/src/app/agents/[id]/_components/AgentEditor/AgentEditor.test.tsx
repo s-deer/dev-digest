@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { Agent } from "@devdigest/shared";
 import messages from "../../../../../../messages/en/agents.json";
@@ -42,6 +42,7 @@ const AGENT: Agent = {
   repo_intel: true,
   enabled: true,
   version: 1,
+  skill_count: 3,
 };
 
 function renderWithIntl(ui: React.ReactElement) {
@@ -67,8 +68,9 @@ describe("A2 Agent Editor (smoke)", () => {
     renderWithIntl(<AgentEditor agent={AGENT} tab="skills" onTab={() => {}} />);
     expect(screen.getByRole("heading", { name: "Skills" })).toBeInTheDocument();
     expect(screen.getByText("Test rubric")).toBeInTheDocument();
-    expect(screen.getAllByText("Enabled for this agent")).toHaveLength(2);
-    expect(screen.getByRole("checkbox", { name: "Test rubric" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("2 of 2 enabled")).toBeInTheDocument();
+    const group = screen.getByRole("group", { name: "Enable Test rubric for this agent" });
+    expect(within(group).getByRole("switch")).toHaveAttribute("aria-checked", "true");
   });
 
   it("filters the available skills", () => {
