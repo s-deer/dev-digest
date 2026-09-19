@@ -30,11 +30,6 @@ pnpm test         # vitest + jsdom, fetch mocked — no API needed
   The contract is enforced by `@devdigest/shared`, and the real journey by
   `../e2e`.
 
-## Do not touch
-
-- `src/vendor/ui` (`@devdigest/ui`) and `src/vendor/shared` — vendored. Change
-  `vendor/shared` only as a deliberate contract change, server side first.
-
 ## Read when
 
 - Read `specs/`, `docs/`, and `INSIGHTS.md` first for what's already

@@ -220,6 +220,60 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('adds only globally and per-agent enabled skills to the prompt trace in attachment order', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Skill runner', provider: 'openai', model: 'gpt-4.1', system_prompt: 'review' },
+      })
+    ).json();
+    const first = (
+      await app.inject({
+        method: 'POST',
+        url: '/skills',
+        payload: { name: 'First', description: 'First rule.', type: 'rubric', body: '# First skill' },
+      })
+    ).json();
+    const disabledForAgent = (
+      await app.inject({
+        method: 'POST',
+        url: '/skills',
+        payload: { name: 'Second', description: 'Second rule.', type: 'rubric', body: '# Second skill' },
+      })
+    ).json();
+    const disabledGlobally = (
+      await app.inject({
+        method: 'POST',
+        url: '/skills',
+        payload: { name: 'Third', description: 'Third rule.', type: 'rubric', body: '# Third skill', enabled: false },
+      })
+    ).json();
+    await app.inject({
+      method: 'POST',
+      url: `/agents/${agent.id}/skills`,
+      payload: {
+        links: [
+          { skill_id: first.id, enabled: true, order: 0 },
+          { skill_id: disabledForAgent.id, enabled: false, order: 1 },
+          { skill_id: disabledGlobally.id, enabled: true, order: 2 },
+        ],
+      },
+    });
+
+    const queued = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    const runId = queued.json().runs[0].run_id as string;
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+
+    expect(trace.prompt_assembly.skills).toBe('# First skill');
+    expect(trace.prompt_assembly.skills_tokens).toBeGreaterThan(0);
+    expect(trace.log.some((line: { msg: string }) => line.msg.includes('skills: 1 enabled skill(s) attached'))).toBe(true);
+    await app.close();
+  });
+
   it('records run cost + tokens and exposes them on runs, reviews, trace and the PR list', async () => {
     // MockLLMProvider reports tokensIn=100, tokensOut=50, costUsd=0.001 per call;
     // the one-file diff is reviewed in a single call.

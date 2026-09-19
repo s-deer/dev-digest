@@ -78,6 +78,13 @@
       "when": 1789492392464,
       "tag": "0010_flowery_zzzax",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789828921187,
+      "tag": "0011_slim_bug",
+      "breakpoints": true
     }
   ]
 }

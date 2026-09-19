@@ -4,17 +4,18 @@
 "use client";
 
 import React from "react";
+import { useTranslations } from "next-intl";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Button, Dropdown, ErrorState, Skeleton, Icon, Badge } from "@devdigest/ui";
+import { Button, Dropdown, ErrorState, Skeleton, Icon, Badge, TextInput } from "@devdigest/ui";
 import { AppShell } from "../../../components/app-shell";
 import { AgentCard } from "../_components/AgentCard";
 import { AgentEditor } from "./_components/AgentEditor";
 import { useAgents, useAgent, useUpdateAgent } from "../../../lib/hooks/agents";
 import { ApiError } from "../../../lib/api";
-
-const VALID_TABS = ["config"];
+import { TAB_KEYS } from "./_components/AgentEditor/constants";
 
 export default function AgentEditorPage() {
+  const t = useTranslations("agents");
   const params = useParams<{ id: string }>();
   const search = useSearchParams();
   const router = useRouter();
@@ -23,8 +24,9 @@ export default function AgentEditorPage() {
   const { data: agents } = useAgents();
   const { data: agent, isLoading, isError, error, refetch } = useAgent(id);
   const update = useUpdateAgent();
+  const [query, setQuery] = React.useState("");
 
-  const tab = VALID_TABS.includes(search.get("tab") ?? "") ? search.get("tab")! : "config";
+  const tab = TAB_KEYS.includes(search.get("tab") ?? "") ? search.get("tab")! : "config";
   const setTab = (t: string) => {
     const sp = new URLSearchParams(search.toString());
     sp.set("tab", t);
@@ -36,6 +38,9 @@ export default function AgentEditorPage() {
     { label: "Agents", href: "/agents" },
     { label: agent?.name ?? "Agent" },
   ];
+  const visibleAgents = (agents ?? []).filter((candidate) =>
+    `${candidate.name} ${candidate.description}`.toLowerCase().includes(query.toLowerCase()),
+  );
 
   if (isError || (!isLoading && !agent)) {
     return (
@@ -64,23 +69,29 @@ export default function AgentEditorPage() {
             background: "var(--bg-surface)",
           }}
         >
-          <div style={{ padding: "16px 16px 12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-              <h1 style={{ fontSize: 18, fontWeight: 700, flex: 1 }}>Agents</h1>
+          <div style={{ padding: "14px 14px 10px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <h1 style={{ fontSize: 16, fontWeight: 700, flex: 1 }}>{t("list.title")}</h1>
               <Dropdown
                 width={210}
                 align="right"
                 trigger={
-                  <Button kind="primary" size="sm" icon="Plus">
-                    Add
+                  <Button kind="primary" size="sm" icon="Plus" iconRight="ChevronDown">
+                    {t("list.addAgent")}
                   </Button>
                 }
-                items={[{ label: "Create from scratch", icon: "Edit", onClick: () => router.push("/agents") }]}
+                items={[{ label: t("list.createFromScratch"), icon: "Edit", onClick: () => router.push("/agents") }]}
               />
             </div>
+            <TextInput
+              value={query}
+              onChange={setQuery}
+              placeholder={t("list.searchPlaceholder")}
+              aria-label={t("list.searchPlaceholder")}
+            />
           </div>
-          <div style={{ flex: 1, overflow: "auto", padding: "0 12px 12px" }}>
-            {(agents ?? []).map((a) => (
+          <div style={{ flex: 1, overflow: "auto", padding: "0 10px 10px" }}>
+            {visibleAgents.map((a) => (
               <AgentCard
                 key={a.id}
                 ag={a}
@@ -100,9 +111,9 @@ export default function AgentEditorPage() {
           </div>
         ) : (
           <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 28px 0", flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 24px 0", flexShrink: 0 }}>
               <Icon.Cpu size={18} style={{ color: "var(--accent)" }} />
-              <h1 style={{ fontSize: 18, fontWeight: 700 }}>{agent.name}</h1>
+              <h1 style={{ fontSize: 17, fontWeight: 700 }}>{agent.name}</h1>
               <Badge color="var(--text-secondary)" mono>
                 {agent.provider}/{agent.model}
               </Badge>

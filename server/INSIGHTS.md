@@ -7,6 +7,12 @@ re-discovered the hard way.
 
 ## Decisions
 
+### 2026-09-19 · Skill activation is an agent attachment concern, not only a global skill flag
+- **Context:** `skills.enabled` and `agent_skills.enabled` during Skills feature implementation.
+- **Insight:** A reusable skill may be active for one agent and disabled for another; the global switch is only a workspace-wide kill switch. Review execution requires both flags before adding a body to the prompt.
+- **Do:** Store and validate `agent_skills.enabled`, filter both flags in `modules/reviews/run-executor.ts`, and expose the attachment state through `GET/POST /agents/:id/skills`.
+- **Evidence:** User-confirmed scope decision; `server/src/db/schema/agents.ts`, `server/src/modules/agents/routes.ts`, `server/src/modules/reviews/run-executor.ts`.
+
 ### 2026-09-19 · SSE completion is not background-runner liveness
 - **Context:** cancellation of `agent_runs` through `ReviewService.cancelRun` and `RunBus`.
 - **Insight:** `RunBus.complete()` closes the stream and clears cancellation, but an executor can still be running; using completion to detect an orphan lets the executor overwrite `cancelled` with `done`.

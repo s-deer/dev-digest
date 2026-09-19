@@ -1,0 +1,11 @@
+{
+  "name": "Skills page renders seeded reusable skills",
+  "description": "Loads the read-only Skills page and confirms the seeded Test Quality and API Contract skills are available without invoking a model.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/skills"], "label": "load the skills page" },
+    { "cmd": ["wait", "--url", "/skills"], "label": "skills route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "skills fetch settles" },
+    { "cmd": ["wait", "--text", "Test Quality Rubric"], "label": "seeded test-quality skill is visible" },
+    { "cmd": ["wait", "--text", "API Contract Compatibility"], "label": "seeded API-contract skill is visible" }
+  ]
+}

@@ -4,9 +4,12 @@
     "crumbSkills": "Skills",
     "heading": "Skills",
     "addSkill": "Add Skill",
+    "createSkill": "Create skill",
+    "importMarkdown": "Import Markdown",
     "searchPlaceholder": "Search skills…",
     "loadError": "Could not load skills.",
     "menu": {
+      "create": "Create skill",
       "fromFile": "Import from file",
       "fromUrl": "Import from URL",
       "community": "Search community skills…"
@@ -30,6 +33,22 @@
       "body": "It may have been deleted."
     }
   },
+  "editor": {
+    "createTitle": "Create a skill",
+    "editTitle": "Edit skill",
+    "name": "Name",
+    "namePlaceholder": "Test edge cases",
+    "description": "Directive description",
+    "descriptionHint": "Describe what this skill directs an agent to do.",
+    "descriptionPlaceholder": "Inspect tests for uncovered behavior and brittle mocks.",
+    "type": "Type",
+    "body": "Skill body (Markdown)",
+    "save": "Save skill",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "delete": "Delete skill",
+    "deleteConfirm": "Delete \"{name}\"? This cannot be undone."
+  },
   "drawer": {
     "title": "Add a skill",
     "subtitle": "Import from a file, a URL, or search vetted community skills",
@@ -49,7 +68,12 @@
     "bodyPlaceholder": "# Rule\nDescribe the rule…",
     "importing": "Importing…",
     "import": "Import skill",
-    "success": "Imported \"{name}\" (stored as untrusted data)."
+    "success": "Imported \"{name}\" (stored as untrusted data).",
+    "choose": "Choose Markdown file",
+    "preview": "Preview import",
+    "confirm": "Confirm and save",
+    "trust": "A foreign skill becomes instructions in an agent prompt only when you confirm it and attach it to an agent. It never receives tools or executes code.",
+    "importDescription": "Imported Markdown skill."
   },
   "url": {
     "label": "Skill URL",

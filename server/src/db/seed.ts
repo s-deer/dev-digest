@@ -18,11 +18,11 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the three built-in agents (General + Security +
- * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
+ * with a few findings, reusable demo skills, and the built-in reviewers, all on
+ * the default openrouter/deepseek-v4-flash provider+model.
  *
- * Course lessons populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * Course lessons populate the remaining tables (conventions, memory, eval, …)
+ * once their features are built — they start empty here.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -175,7 +175,41 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     ]);
   }
 
-  // ---- built-in agents (the three starter presets) ----
+  // ---- reusable demo skills -----------------------------------------------
+  const seedSkills: Array<typeof t.skills.$inferInsert> = [
+    {
+      workspaceId,
+      name: 'Test Quality Rubric',
+      description: 'Directs a reviewer to inspect test coverage, corner cases, mocks, and flakes.',
+      type: 'rubric',
+      source: 'manual',
+      body: `# Test quality\nInspect changed tests for untested branches and boundary values. Flag happy-path-only coverage when the changed production code has error, false, empty, or limit branches. Flag mocks that replace the behaviour under test and assertions that do not prove an observable result.`,
+      enabled: true,
+      version: 1,
+    },
+    {
+      workspaceId,
+      name: 'API Contract Compatibility',
+      description: 'Directs a reviewer to identify breaking route contract changes.',
+      type: 'convention',
+      source: 'extracted',
+      body: `# API contract compatibility\nTreat a changed route path, HTTP method, request field, response field, status code, or nullability as a potential breaking change. Flag it when the diff does not update every visible caller, contract, or migration path required to preserve compatibility.`,
+      enabled: true,
+      version: 1,
+    },
+  ];
+  for (const skill of seedSkills) {
+    const [existing] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, skill.name)));
+    if (!existing) {
+      const [created] = await db.insert(t.skills).values(skill).returning();
+      await db.insert(t.skillVersions).values({ skillId: created!.id, version: 1, body: created!.body });
+    }
+  }
+
+  // ---- built-in agents -----------------------------------------------------
   // Prompt bodies live in ./seed-prompts.ts (mirrored in docs/agent-prompts/*.md).
   const seedAgents: Array<typeof t.agents.$inferInsert> = [
     {
@@ -211,6 +245,28 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description: 'Checks tests for missing branches, corner cases, brittle mocks, and flakes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: GENERAL_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
+    {
+      workspaceId,
+      name: 'API Contract Reviewer',
+      description: 'Detects breaking route and payload contract changes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: GENERAL_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -218,6 +274,35 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  const [testSkill] = await db
+    .select({ id: t.skills.id })
+    .from(t.skills)
+    .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, 'Test Quality Rubric')));
+  const [contractSkill] = await db
+    .select({ id: t.skills.id })
+    .from(t.skills)
+    .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, 'API Contract Compatibility')));
+  const [testAgent] = await db
+    .select({ id: t.agents.id })
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'Test Quality Reviewer')));
+  const [contractAgent] = await db
+    .select({ id: t.agents.id })
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'API Contract Reviewer')));
+  if (testSkill && testAgent) {
+    await db
+      .insert(t.agentSkills)
+      .values({ agentId: testAgent.id, skillId: testSkill.id, enabled: true, order: 0 })
+      .onConflictDoNothing();
+  }
+  if (contractSkill && contractAgent) {
+    await db
+      .insert(t.agentSkills)
+      .values({ agentId: contractAgent.id, skillId: contractSkill.id, enabled: true, order: 0 })
+      .onConflictDoNothing();
   }
 
   return { workspaceId, userId };

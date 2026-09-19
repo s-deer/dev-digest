@@ -64,3 +64,26 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — skills', () => {
+  it('keeps enabled skill bodies in caller order and records their token contribution', () => {
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'DIFF',
+      skills: ['# First rule', '# Second rule'],
+      skillTokens: 9,
+    });
+
+    const user = messages[1]!.content;
+    expect(user).toContain('## Skills / rules\n# First rule\n\n# Second rule');
+    expect(user.indexOf('# First rule')).toBeLessThan(user.indexOf('# Second rule'));
+    expect(assembly.skills_tokens).toBe(9);
+  });
+
+  it('omits the skills block and records zero tokens when no skill is resolved', () => {
+    const { messages, assembly } = assemblePrompt({ system: 'sys', diff: 'DIFF' });
+    expect(messages[1]!.content).not.toContain('## Skills / rules');
+    expect(assembly.skills).toBeNull();
+    expect(assembly.skills_tokens).toBe(0);
+  });
+});

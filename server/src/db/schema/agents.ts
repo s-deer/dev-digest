@@ -57,6 +57,9 @@ export const agentSkills = pgTable(
     skillId: uuid('skill_id')
       .notNull()
       .references(() => skills.id, { onDelete: 'cascade' }),
+    // A reusable skill can be attached to several agents but enabled only for
+    // selected ones. `skills.enabled` remains the workspace-wide kill switch.
+    enabled: boolean('enabled').notNull().default(true),
     order: integer('order').notNull().default(0),
   },
   (t) => ({ pk: primaryKey({ columns: [t.agentId, t.skillId] }) }),

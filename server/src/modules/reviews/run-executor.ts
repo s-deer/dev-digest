@@ -184,6 +184,20 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Skills have no runtime capabilities: the only value that reaches the
+      // pure reviewer is the ordered Markdown configuration text. Both gates
+      // must be on, so disabling a skill globally or for this agent omits it.
+      const linkedSkills = await this.agents.linkedSkills(agent.id);
+      const skillBodies = linkedSkills
+        .filter((link) => link.enabled && link.skill.enabled)
+        .map((link) => link.skill.body);
+      const skillTokens = skillBodies.length > 0 ? this.container.tokenizer.count(skillBodies.join('\n\n')) : 0;
+      runLog.info(
+        skillBodies.length > 0
+          ? `skills: ${skillBodies.length} enabled skill(s) attached (+${skillTokens} token(s))`
+          : 'skills: no enabled skills attached',
+      );
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -193,6 +207,8 @@ export class ReviewRunExecutor {
         model: agent.model,
         diff,
         llm,
+        skills: skillBodies,
+        skillTokens,
         // Per-agent review strategy (configured in the Agent editor); falls back
         // to the studio default. single-pass = whole diff in one call.
         strategy: agent.strategy ?? REVIEW_STRATEGY,
@@ -427,7 +443,14 @@ export class ReviewRunExecutor {
         source: 'local',
       },
       stats: { duration_ms: durationMs, tokens_in: 0, tokens_out: 0, cost_usd: null, findings: 0, grounding },
-      prompt_assembly: { system: agent.systemPrompt, skills: null, memory: null, specs: null, user: '' },
+      prompt_assembly: {
+        system: agent.systemPrompt,
+        skills: null,
+        skills_tokens: 0,
+        memory: null,
+        specs: null,
+        user: '',
+      },
       tool_calls: [],
       raw_output: '',
       memory_pulled: [],

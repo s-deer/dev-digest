@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Agent, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import type { Agent, AgentSkillLink, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
 
 export function useAgents() {
   return useQuery({
@@ -87,5 +87,32 @@ export function useProviderModels(provider: Provider | null | undefined) {
     queryFn: () => api.get<ModelInfo[]>(`/providers/${provider}/models`),
     enabled: !!provider,
     staleTime: 5 * 60_000,
+  });
+}
+
+export interface AgentSkillAttachment {
+  skill_id: string;
+  enabled: boolean;
+  order: number;
+}
+
+export function useAgentSkillLinks(agentId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["agent-skills", agentId],
+    queryFn: () => api.get<AgentSkillLink[]>(`/agents/${agentId}/skills`),
+    enabled: !!agentId,
+  });
+}
+
+export function useSetAgentSkillLinks() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ agentId, links }: { agentId: string; links: AgentSkillAttachment[] }) =>
+      api.post<AgentSkillLink[]>(`/agents/${agentId}/skills`, { links }),
+    onSuccess: (links, { agentId }) => {
+      queryClient.setQueryData(["agent-skills", agentId], links);
+      queryClient.invalidateQueries({ queryKey: ["agents"] });
+      queryClient.invalidateQueries({ queryKey: ["agent", agentId] });
+    },
   });
 }

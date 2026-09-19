@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
@@ -45,6 +45,13 @@ export interface UpdateAgent {
 /** A skill linked to an agent (with its order), joined from agent_skills. */
 export interface LinkedSkillRow {
   skill: typeof t.skills.$inferSelect;
+  enabled: boolean;
+  order: number;
+}
+
+export interface SkillLinkInput {
+  skillId: string;
+  enabled: boolean;
   order: number;
 }
 
@@ -191,12 +198,12 @@ export class AgentsRepository {
   /** Skills linked to an agent, in `order` ascending. */
   async linkedSkills(agentId: string): Promise<LinkedSkillRow[]> {
     const rows = await this.db
-      .select({ skill: t.skills, order: t.agentSkills.order })
+      .select({ skill: t.skills, enabled: t.agentSkills.enabled, order: t.agentSkills.order })
       .from(t.agentSkills)
       .innerJoin(t.skills, eq(t.agentSkills.skillId, t.skills.id))
       .where(eq(t.agentSkills.agentId, agentId))
       .orderBy(asc(t.agentSkills.order));
-    return rows.map((r) => ({ skill: r.skill, order: r.order }));
+    return rows.map((r) => ({ skill: r.skill, enabled: r.enabled, order: r.order }));
   }
 
   async skillIdsForAgent(agentId: string): Promise<string[]> {
@@ -204,33 +211,52 @@ export class AgentsRepository {
     return links.map((l) => l.skill.id);
   }
 
-  /** Link a skill to an agent at a given order (idempotent: upserts order). */
-  async linkSkill(agentId: string, skillId: string, order: number): Promise<void> {
-    await this.db
-      .insert(t.agentSkills)
-      .values({ agentId, skillId, order })
-      .onConflictDoUpdate({
-        target: [t.agentSkills.agentId, t.agentSkills.skillId],
-        set: { order },
-      });
-  }
-
-  async unlinkSkill(agentId: string, skillId: string): Promise<void> {
-    await this.db
-      .delete(t.agentSkills)
-      .where(and(eq(t.agentSkills.agentId, agentId), eq(t.agentSkills.skillId, skillId)));
+  /** Return only skill IDs that belong to the supplied workspace. */
+  async existingSkillIds(workspaceId: string, skillIds: string[]): Promise<string[]> {
+    if (skillIds.length === 0) return [];
+    const rows = await this.db
+      .select({ id: t.skills.id })
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), inArray(t.skills.id, skillIds)));
+    return rows.map((row) => row.id);
   }
 
   /**
-   * Replace the full set of linked skills for an agent with `skillIds`, assigning
-   * order = index. Used by the "Skills" editor tab (attach/reorder). Skills not in
-   * the list are unlinked.
+   * Replace the attachment list atomically. An attachment change changes the
+   * prompt, so it creates the next immutable agent configuration snapshot.
    */
-  async setSkills(agentId: string, skillIds: string[]): Promise<void> {
-    await this.db.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agentId));
-    if (skillIds.length === 0) return;
-    await this.db
-      .insert(t.agentSkills)
-      .values(skillIds.map((skillId, i) => ({ agentId, skillId, order: i })));
+  async setSkills(agent: AgentRow, links: SkillLinkInput[]): Promise<void> {
+    const nextVersion = agent.version + 1;
+    await this.db.transaction(async (tx) => {
+      await tx.delete(t.agentSkills).where(eq(t.agentSkills.agentId, agent.id));
+      if (links.length > 0) {
+        await tx.insert(t.agentSkills).values(
+          links.map((link) => ({
+            agentId: agent.id,
+            skillId: link.skillId,
+            enabled: link.enabled,
+            order: link.order,
+          })),
+        );
+      }
+      await tx.update(t.agents).set({ version: nextVersion }).where(eq(t.agents.id, agent.id));
+      await tx.insert(t.agentVersions).values({
+        agentId: agent.id,
+        version: nextVersion,
+        configJson: {
+          provider: agent.provider,
+          model: agent.model,
+          system_prompt: agent.systemPrompt,
+          output_schema: agent.outputSchema,
+          strategy: agent.strategy,
+          ci_fail_on: agent.ciFailOn,
+          repo_intel: agent.repoIntel,
+          skills: [...links]
+            .filter((link) => link.enabled)
+            .sort((a, b) => a.order - b.order)
+            .map((link) => link.skillId),
+        },
+      });
+    });
   }
 }

@@ -41,6 +41,8 @@ export interface PromptParts {
   system: string;
   /** Linked skill bodies (trusted-ish; community skills should be sanitized upstream). */
   skills?: string[];
+  /** Server-calculated token contribution of the linked skill bodies. */
+  skillTokens?: number;
   /** Relevant memory items (trusted, curated). */
   memory?: string[];
   /** Project-context spec chunks (untrusted content). */
@@ -129,6 +131,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   const assembly: PromptAssembly = {
     system,
     skills: skillsBlock ?? null,
+    skills_tokens: parts.skillTokens ?? 0,
     memory: memoryBlock ?? null,
     specs: specsBlock ?? null,
     callers: parts.callers ?? null,

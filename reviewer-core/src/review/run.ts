@@ -54,6 +54,8 @@ export interface ReviewInput {
   strategy?: ReviewStrategy;
   /** Resolved skill bodies (NOT slugs). */
   skills?: string[];
+  /** Server-calculated token contribution of the resolved skill bodies. */
+  skillTokens?: number;
   /** Curated memory items. */
   memory?: string[];
   /** Project-context spec chunks (untrusted; delimiter-wrapped downstream). */
@@ -130,6 +132,7 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
   const promptParts = {
     system: input.systemPrompt,
     skills: input.skills,
+    skillTokens: input.skillTokens,
     memory: input.memory,
     specs: input.specs,
     callers: input.callers,

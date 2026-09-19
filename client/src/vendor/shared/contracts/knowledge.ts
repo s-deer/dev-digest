@@ -131,6 +131,13 @@ export const Skill = z.object({
 });
 export type Skill = z.infer<typeof Skill>;
 
+/** A Markdown import is parsed for preview before the user creates a skill. */
+export const SkillImportPreview = z.object({
+  name: z.string(),
+  body: z.string(),
+});
+export type SkillImportPreview = z.infer<typeof SkillImportPreview>;
+
 export const CommunitySkill = z.object({
   name: z.string(),
   repo: z.string(),
@@ -188,6 +195,7 @@ export type Agent = z.infer<typeof Agent>;
 export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
+  enabled: z.boolean(),
   order: z.number().int(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
