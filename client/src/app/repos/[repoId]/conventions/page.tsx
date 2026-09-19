@@ -16,7 +16,7 @@ export default function ConventionsPage() {
   const repoName = activeRepo?.full_name ?? repoId;
 
   return (
-    <AppShell crumb={[{ label: t("breadcrumb.skillsLab") }, { label: t("breadcrumb.conventions") }, { label: repoName, mono: true }]}>
+    <AppShell crumb={[{ label: t("breadcrumb.skillsLab") }, { label: t("breadcrumb.conventions") }]}>
       {notFound ? <RepoNotFound /> : <ConventionsView repoId={repoId} repoName={repoName} branch={activeRepo?.default_branch ?? "main"} />}
     </AppShell>
   );

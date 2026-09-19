@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Button, Chip, MonoLink, ProgressBar, SelectInput, Textarea } from "@devdigest/ui";
+import { Button, MonoLink, ProgressBar, SelectInput, Textarea } from "@devdigest/ui";
 import type { ConventionCandidate, ConventionCategory, ConventionStatus } from "@devdigest/shared";
 import { githubBlobUrl } from "@/lib/github-urls";
 import { useUpdateConvention } from "@/lib/hooks/conventions";
@@ -29,7 +29,7 @@ export function ConventionCard({ candidate, repoFullName, branch }: { candidate:
   const setStatus = (status: ConventionStatus) => update.mutate({ id: candidate.id, patch: { status } });
 
   return (
-    <article style={{ ...s.card, ...(candidate.status === "accepted" ? s.cardAccepted : {}) }}>
+    <article className="dd-convention-card" style={{ ...s.card, ...(candidate.status === "accepted" ? s.cardAccepted : {}) }}>
       <div>
         {editing ? (
           <div style={s.edit}>
@@ -44,33 +44,34 @@ export function ConventionCard({ candidate, repoFullName, branch }: { candidate:
         ) : (
           <>
             <h2 style={s.rule}>{candidate.rule}</h2>
-            <div style={{ marginTop: 9 }}><Chip>{t(`categories.${candidate.category}`)}</Chip></div>
-            {candidate.rationale && <p style={s.rationale}>{candidate.rationale}</p>}
             <div style={s.evidence}>
               <div style={s.evidenceTop}>
                 <MonoLink href={evidenceUrl}>{candidate.evidence_path}:{candidate.evidence_line ?? "?"}</MonoLink>
-                <Button size="sm" kind="ghost" onClick={() => navigator.clipboard?.writeText(candidate.evidence_snippet)}>{t("card.copy")}</Button>
+                <Button size="sm" kind="ghost" icon="Copy" aria-label={t("card.copy")} onClick={() => navigator.clipboard?.writeText(candidate.evidence_snippet)} />
               </div>
               <pre style={s.snippet}>{candidate.evidence_snippet}</pre>
             </div>
             <div style={s.confidence}>
-              <ProgressBar value={percent} color={percent >= 85 ? "var(--good)" : "var(--warn)"} />
-              <span className="mono tnum" style={{ color: percent >= 85 ? "var(--good)" : "var(--warn)", fontSize: 12 }}>{percent}%</span>
+              <span style={s.confidenceLabel}>{t("card.confidence")}</span>
+              <div style={s.confidenceBar}>
+                <ProgressBar value={percent} height={5} color={percent >= 85 ? "var(--ok)" : "var(--warn)"} />
+              </div>
+              <span className="mono tnum" style={{ color: percent >= 85 ? "var(--ok)" : "var(--warn)", fontSize: 11 }}>{percent}%</span>
             </div>
           </>
         )}
       </div>
       {!editing && (
-        <div style={s.cardActions}>
+        <div className="dd-convention-card-actions" style={s.cardActions}>
           {candidate.status === "rejected" ? (
-            <Button kind="secondary" onClick={() => setStatus("pending")} loading={update.isPending}>{t("card.undo")}</Button>
+            <Button full kind="secondary" icon="CornerDownRight" onClick={() => setStatus("pending")} loading={update.isPending}>{t("card.undo")}</Button>
           ) : (
             <>
-              <Button kind={candidate.status === "accepted" ? "primary" : "secondary"} onClick={() => setStatus(candidate.status === "accepted" ? "pending" : "accepted")} loading={update.isPending}>
+              <Button full kind={candidate.status === "accepted" ? "primary" : "secondary"} icon={candidate.status === "accepted" ? "Check" : undefined} onClick={() => setStatus(candidate.status === "accepted" ? "pending" : "accepted")} loading={update.isPending}>
                 {candidate.status === "accepted" ? t("card.accepted") : t("card.accept")}
               </Button>
-              <Button kind="danger" onClick={() => setStatus("rejected")} loading={update.isPending}>{t("card.reject")}</Button>
-              <Button kind="ghost" onClick={() => setEditing(true)}>{t("card.edit")}</Button>
+              <Button full kind="ghost" icon="X" onClick={() => setStatus("rejected")} loading={update.isPending}>{t("card.reject")}</Button>
+              <Button full kind="ghost" icon="Edit" onClick={() => setEditing(true)}>{t("card.edit")}</Button>
             </>
           )}
         </div>

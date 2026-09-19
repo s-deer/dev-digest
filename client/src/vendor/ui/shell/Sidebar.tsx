@@ -11,13 +11,13 @@ export function Sidebar({ ctx }: { ctx: ShellContext }) {
   return (
     <aside
       style={{
-        width: 264,
+        width: 224,
         flexShrink: 0,
         background: "var(--bg-surface)",
         borderRight: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
-        padding: "24px 14px 16px",
+        padding: "16px 10px 12px",
         gap: 2,
         overflow: "hidden",
       }}

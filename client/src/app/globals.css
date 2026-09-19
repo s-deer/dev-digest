@@ -59,3 +59,42 @@
   border-left: 3px solid var(--border-strong);
   color: var(--text-secondary);
 }
+
+/* Conventions follows the fixed-width prototype on desktop and stacks its
+   action columns on narrow screens without changing the shared card system. */
+.dd-conventions-page {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .dd-conventions-page {
+    padding: 16px !important;
+  }
+
+  .dd-conventions-header {
+    flex-direction: column;
+  }
+
+  .dd-conventions-header > :last-child {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+
+  .dd-convention-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dd-convention-card-actions {
+    min-width: 0 !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+  }
+
+  .dd-convention-card-actions > button {
+    flex: 1 1 130px;
+  }
+
+  .dd-conventions-modal-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}
