@@ -59,14 +59,14 @@ d('conventions routes', () => {
       db: pg.handle.db,
       overrides: {
         git: new MockGitClient({ files: { 'src/server.ts': source } }),
-        llm: { openai: llm },
+        llm: { openrouter: llm },
         repoIntel: repoIntel(paths),
       },
     });
   }
 
   it('extracts, verifies, persists across app rebuilds, and records counters', async () => {
-    const llm = new MockLLMProvider('openai', {
+    const llm = new MockLLMProvider('openrouter', {
       structuredBySchema: {
         ConventionExtraction: {
           candidates: [
@@ -112,7 +112,7 @@ d('conventions routes', () => {
   });
 
   it('does not call the model when the repository has no indexed source sample', async () => {
-    const llm = new MockLLMProvider('openai');
+    const llm = new MockLLMProvider('openrouter');
     const server = await app(llm, []);
     const response = await server.inject({ method: 'POST', url: `/repos/${repoId}/conventions/extract` });
     expect(response.statusCode).toBe(422);
@@ -125,8 +125,8 @@ d('conventions routes', () => {
     const values = {
       workspaceId,
       repoId,
-      provider: 'openai' as const,
-      model: 'gpt-4.1',
+      provider: 'openrouter' as const,
+      model: 'deepseek/deepseek-v4-flash',
       sampledFiles: [],
     };
 

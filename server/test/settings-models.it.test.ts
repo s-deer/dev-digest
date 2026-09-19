@@ -55,6 +55,10 @@ d('Settings: feature models + secrets status (Testcontainers pg)', () => {
       provider: 'openai',
       model: 'gpt-4.1',
     });
+    expect(await resolveFeatureModel(app.container, workspaceId, 'conventions')).toEqual({
+      provider: 'openrouter',
+      model: 'deepseek/deepseek-v4-flash',
+    });
 
     await app.close();
   });
