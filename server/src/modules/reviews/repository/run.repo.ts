@@ -2,11 +2,8 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
 import type { RunSummary, RunTrace } from '@devdigest/shared';
-import {
-  emptyFindingsSummary,
-  findingSummaryColumns,
-  summarizeFindings,
-} from '../findings-summary.js';
+import { emptyFindingsSummary, summarizeFindings } from '../findings-summary.js';
+import { findingSummaryColumns } from './review.repo.js';
 
 // ---- in-flight / history --------------------------------------------------
 
@@ -38,6 +35,23 @@ export async function activeRunsForPull(
     agent_id: r.agentId,
     agent_name: r.agentName ?? null,
     ran_at: r.ranAt ? r.ranAt.toISOString() : null,
+  }));
+}
+
+/** Cost of every completed run on the given PRs — the PR list folds these into
+ *  its COST column. Callers pass ids from a workspace-scoped PR list. */
+export async function doneRunCostsForPulls(
+  db: Db,
+  prIds: string[],
+): Promise<{ prId: string | null; costUsd: number | null }[]> {
+  if (prIds.length === 0) return [];
+  const rows = await db
+    .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
+    .from(t.agentRuns)
+    .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done')));
+  return rows.map((row) => ({
+    prId: row.prId,
+    costUsd: row.costUsd == null ? null : Number(row.costUsd),
   }));
 }
 
@@ -79,7 +93,7 @@ export async function listRunsForPull(
     duration_ms: run.durationMs,
     tokens_in: run.tokensIn,
     tokens_out: run.tokensOut,
-    cost_usd: run.costUsd,
+    cost_usd: run.costUsd == null ? null : Number(run.costUsd),
     findings_count: run.findingsCount,
     grounding: run.grounding,
     ran_at: run.ranAt ? run.ranAt.toISOString() : null,
@@ -113,13 +127,28 @@ export async function deleteAgentRun(
 }
 
 /** Mark a still-running run as cancelled (no-op if it already finished). */
-export async function cancelRunIfRunning(db: Db, runId: string): Promise<boolean> {
+export async function cancelRunIfRunning(db: Db, workspaceId: string, runId: string): Promise<boolean> {
   const rows = await db
     .update(t.agentRuns)
     .set({ status: 'cancelled' })
-    .where(and(eq(t.agentRuns.id, runId), eq(t.agentRuns.status, 'running')))
+    .where(
+      and(
+        eq(t.agentRuns.workspaceId, workspaceId),
+        eq(t.agentRuns.id, runId),
+        eq(t.agentRuns.status, 'running'),
+      ),
+    )
     .returning({ id: t.agentRuns.id });
   return rows.length > 0;
+}
+
+/** Check run ownership before exposing its trace or event stream. */
+export async function hasRun(db: Db, workspaceId: string, runId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: t.agentRuns.id })
+    .from(t.agentRuns)
+    .where(and(eq(t.agentRuns.workspaceId, workspaceId), eq(t.agentRuns.id, runId)));
+  return row !== undefined;
 }
 
 /** On boot: any run still 'running' is orphaned (its process died / restarted),
@@ -195,7 +224,7 @@ export async function completeAgentRun(
       blockers: values.blockers ?? null,
       error: values.error ?? null,
     })
-    .where(eq(t.agentRuns.id, runId));
+    .where(and(eq(t.agentRuns.id, runId), eq(t.agentRuns.status, 'running')));
 }
 
 /** Persist the WHOLE run log as ONE document. PK = runId → agent_runs. */
@@ -206,7 +235,15 @@ export async function saveRunTrace(db: Db, runId: string, trace: RunTrace): Prom
     .onConflictDoUpdate({ target: t.runTraces.runId, set: { trace } });
 }
 
-export async function getRunTrace(db: Db, runId: string): Promise<RunTrace | undefined> {
-  const [row] = await db.select().from(t.runTraces).where(eq(t.runTraces.runId, runId));
+export async function getRunTrace(
+  db: Db,
+  workspaceId: string,
+  runId: string,
+): Promise<RunTrace | undefined> {
+  const [row] = await db
+    .select({ trace: t.runTraces.trace })
+    .from(t.runTraces)
+    .innerJoin(t.agentRuns, eq(t.agentRuns.id, t.runTraces.runId))
+    .where(and(eq(t.agentRuns.workspaceId, workspaceId), eq(t.runTraces.runId, runId)));
   return row ? (row.trace as RunTrace) : undefined;
 }

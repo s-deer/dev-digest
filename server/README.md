@@ -71,9 +71,10 @@ flowchart TB
   subgraph Review["Review & runs"]
     reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace)"]
   end
-  subgraph Agents["Agents"]
+   subgraph Agents["Agents"]
     agents["agents<br/>/agents · /agents/:id"]
-  end
+    skills["skills<br/>/skills · /skills/:id · /skills/:id/versions<br/>/skills/:id/versions/:v/restore · /skills/import-preview<br/>/agents/:id/skills"]
+   end
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
   end
@@ -91,7 +92,7 @@ flowchart TB
 | Var | Default | Notes |
 |-----|---------|-------|
 | `DATABASE_URL` | `postgres://devdigest:devdigest@localhost:5432/devdigest` | required to migrate/serve |
-| `API_PORT` / `WEB_PORT` | `3001` / `3000` | API port; `WEB_PORT` also sets the allowed CORS origin |
+| `API_PORT` / `API_HOST` / `WEB_PORT` | `3001` / `127.0.0.1` / `3000` | API bind; `WEB_PORT` also sets the allowed CORS origin |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `OPENROUTER_API_KEY` | — | optional, per-provider; also settable via Settings UI |
 | `GITHUB_TOKEN` | — | optional; PAT with repo scope (`GITHUB_PAT` accepted as a fallback) |
 | `EMBEDDINGS_ENABLED` | `false` | memory/RAG embeddings (OpenAI); off → **zero** OpenAI calls |
@@ -107,6 +108,25 @@ through `SecretsProvider` (`~/.devdigest/secrets.json`, mode `0600`, with
 Migrations are **not** applied on boot — run `pnpm db:migrate` (pgvector is
 enabled by migration `0000`). `pnpm db:seed` is idempotent demo data
 (`acme/payments-api`, PR #482, the two built-in agents).
+
+## Skills (non-obvious)
+
+- **The database is the source of truth.** `skills` holds the current body;
+  `skill_versions` is an append-only history. A changed body bumps `version` and
+  appends a snapshot; `POST /skills/:id/versions/:v/restore` copies an old body
+  into a *new* version (`note: "Restored from vN"`) rather than rewinding.
+- **Two activation flags.** `skills.enabled` is a workspace-wide kill switch;
+  `agent_skills.enabled` is per agent. A body reaches the prompt only when both
+  are on, in `agent_skills.order` (see `run-executor.ts`).
+- **Import never persists or executes.** `POST /skills/import-preview` takes
+  `{ filename, content_base64 }` for a `.md` or `.zip` (≤ 1 MB, ≤ 200 entries,
+  ≤ 5 MB unpacked). `modules/skills/importer.ts` unzips *in memory*, keeps only
+  the Markdown core (`SKILL.md` → nested `SKILL.md` → the only `.md`) and lists
+  every other entry in `ignored_files`. Saving is a separate `POST /skills` with
+  `source: "imported_file"` after the user confirms the preview.
+- **Trace.** Each enabled skill is a `prompt_assembly.skill_blocks[]` entry with
+  its own tiktoken count over the exact rendered block; `skills_tokens` is their
+  sum.
 
 ## Review context (non-obvious)
 

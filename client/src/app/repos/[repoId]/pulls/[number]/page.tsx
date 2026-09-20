@@ -175,6 +175,7 @@ export default function PRDetailPage() {
         <RunTraceDrawer
           runId={traceRunId}
           prNumber={pr.number}
+          running={liveRunIds.includes(traceRunId)}
           findings={runs.find((r) => r.run_id === traceRunId)?.findings ?? []}
           agentName={runs.find((r) => r.run_id === traceRunId)?.agent_name ?? null}
           onClose={() => setParam("trace", null)}

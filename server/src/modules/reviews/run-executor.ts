@@ -1,6 +1,6 @@
 import type { Container } from '../../platform/container.js';
-import type { Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers } from '@devdigest/reviewer-core';
+import type { PromptSkillBlock, Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import { reviewPullRequest, countBlockers, renderSkillBlock } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -184,6 +184,27 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Skills have no runtime capabilities: the only value that reaches the
+      // pure reviewer is the ordered Markdown configuration text. Both gates
+      // must be on, so disabling a skill globally or for this agent omits it.
+      // Each block's token count covers exactly the text the engine renders.
+      const linkedSkills = await this.agents.linkedSkills(agent.id);
+      const skillBlocks: PromptSkillBlock[] = linkedSkills
+        .filter((link) => link.enabled && link.skill.enabled)
+        .map((link, order) => {
+          const block = { skill_id: link.skill.id, name: link.skill.name, version: link.skill.version, order, body: link.skill.body };
+          return { ...block, tokens: this.container.tokenizer.count(renderSkillBlock(block)) };
+        });
+      const skillTokens = skillBlocks.reduce((sum, block) => sum + block.tokens, 0);
+      runLog.info(
+        skillBlocks.length > 0
+          ? `skills: ${skillBlocks.length} enabled skill(s) attached (+${skillTokens} token(s))`
+          : 'skills: no enabled skills attached',
+      );
+      for (const block of skillBlocks) {
+        runLog.info(`skill[${block.order}]: ${block.name} v${block.version} (+${block.tokens} token(s))`);
+      }
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -193,6 +214,7 @@ export class ReviewRunExecutor {
         model: agent.model,
         diff,
         llm,
+        skills: skillBlocks,
         // Per-agent review strategy (configured in the Agent editor); falls back
         // to the studio default. single-pass = whole diff in one call.
         strategy: agent.strategy ?? REVIEW_STRATEGY,
@@ -211,6 +233,7 @@ export class ReviewRunExecutor {
           if (this.container.runBus.isCancelled(runId)) throw new RunCancelledError();
         },
       });
+      if (this.container.runBus.isCancelled(runId)) throw new RunCancelledError();
       const { tokensIn, tokensOut, costUsd, grounding } = outcome;
 
       const keptFindings = outcome.review.findings;
@@ -426,7 +449,15 @@ export class ReviewRunExecutor {
         source: 'local',
       },
       stats: { duration_ms: durationMs, tokens_in: 0, tokens_out: 0, cost_usd: null, findings: 0, grounding },
-      prompt_assembly: { system: agent.systemPrompt, skills: null, memory: null, specs: null, user: '' },
+      prompt_assembly: {
+        system: agent.systemPrompt,
+        skills: null,
+        skills_tokens: 0,
+        skill_blocks: [],
+        memory: null,
+        specs: null,
+        user: '',
+      },
       tool_calls: [],
       raw_output: '',
       memory_pulled: [],

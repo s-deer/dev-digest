@@ -14,6 +14,7 @@
 // Prompt assembly + prompt-injection hardening.
 export {
   assemblePrompt,
+  renderSkillBlock,
   wrapUntrusted,
   type PromptParts,
   type AssembledPrompt,

@@ -1,4 +1,98 @@
 {
+  "breadcrumb": {
+    "skillsLab": "Skills Lab",
+    "conventions": "Conventions"
+  },
+  "title": "Conventions in {repo}",
+  "titlePrefix": "Conventions in",
+  "loading": "Loading conventions…",
+  "createSkill": "Create skill",
+  "acceptAll": "Accept all pending",
+  "scan": {
+    "run": "Run Scan",
+    "rescan": "ReScan",
+    "rescanConfirm": "Pending candidates will be replaced. Accepted and rejected ones are kept.",
+    "none": "No scan has run yet.",
+    "meta": "Detected from {files} sample files · last scan {time}",
+    "time": {
+      "justNow": "just now",
+      "minutes": "{count}m ago",
+      "hours": "{count}h ago"
+    },
+    "failed": "Scan failed",
+    "nothing": "Nothing grounded this time — {proposed} proposed, {dropped} dropped by the evidence check."
+  },
+  "filters": {
+    "label": "Convention filters",
+    "all": "All",
+    "pending": "Pending",
+    "accepted": "Accepted",
+    "rejected": "Rejected"
+  },
+  "categories": {
+    "naming": "Naming",
+    "structure": "Structure",
+    "errors": "Errors",
+    "testing": "Testing",
+    "imports": "Imports",
+    "typing": "Typing",
+    "api": "API",
+    "general": "General"
+  },
+  "empty": {
+    "beforeScan": "No conventions extracted yet",
+    "beforeScanBody": "Run a scan to surface house rules backed by repository evidence.",
+    "afterScan": "No candidates in this filter",
+    "afterScanBody": "Accept or edit pending candidates to build a convention skill."
+  },
+  "errors": {
+    "title": "Could not load conventions",
+    "body": "Try loading the conventions again."
+  },
+  "card": {
+    "copy": "Copy",
+    "accept": "Accept",
+    "accepted": "Accepted",
+    "reject": "Reject",
+    "edit": "Edit",
+    "undo": "Undo",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confidence": "Confidence",
+    "accepting": "Accepting…",
+    "acceptAsSkill": "Accept as Skill"
+  },
+  "modal": {
+    "title": "Create skill from conventions",
+    "bannerLead": "Merged from",
+    "bannerAccepted": "{count} accepted conventions",
+    "bannerIn": "in",
+    "bannerTail": "Everything below is editable before you save.",
+    "updates": "Updates existing repo-conventions v{from} → v{to}",
+    "descriptionHint": "The skill's interface — phrase it as a directive: Flag… or Require…",
+    "bodyHint": "The only text sent to the model.",
+    "enabled": "Enabled",
+    "enabledHint": "Whether this block is added to agents' prompts.",
+    "agent": "Attach to agent",
+    "agentPlaceholder": "Choose an agent",
+    "editor": {
+      "edit": "Edit",
+      "preview": "Preview"
+    },
+    "savedNew": "Saved as v{version} · added to Skills Lab",
+    "savedVersion": "Saved as v{version} · added to Skills Lab",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "discardConfirm": "Discard changes?"
+  },
+  "toasts": {
+    "created": "Skill {name} created and attached.",
+    "acceptedAll": "All pending conventions accepted."
+  },
+  "selection": {
+    "deselectAll": "Deselect all",
+    "summary": "{accepted} of {total} accepted"
+  },
   "page": {
     "crumbLab": "Skills Lab",
     "crumbConventions": "Conventions",
@@ -6,21 +100,15 @@
     "repoFallback": "repo",
     "subtitle": "Scan the cloned repo to surface house-rules — each backed by evidence you can turn into a Skill.",
     "scanning": "Scanning…",
-    "rescan": "Re-scan",
-    "runExtraction": "Run extraction",
+    "rescan": "ReScan",
+    "runExtraction": "Run Scan",
     "extractionFailed": "Extraction failed",
     "loadError": "Could not load conventions.",
     "empty": {
       "title": "No conventions extracted yet",
       "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
-      "cta": "Run extraction"
+      "cta": "Run Scan"
     },
     "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
-  },
-  "card": {
-    "confidence": "Confidence",
-    "accepted": "Accepted",
-    "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
   }
 }

@@ -45,21 +45,21 @@ export function Modal({
             display: "flex",
             alignItems: "flex-start",
             gap: 14,
-            padding: "18px 24px",
+            padding: "16px 20px",
             borderBottom: "1px solid var(--border)",
           }}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{title}</div>
+            <div style={{ fontSize: 15, fontWeight: 700 }}>{title}</div>
             {subtitle && (
-              <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>{subtitle}</div>
+              <div style={{ fontSize: 12.5, color: "var(--text-secondary)", marginTop: 2 }}>{subtitle}</div>
             )}
           </div>
           {onClose && <IconBtn icon="X" label="Close" onClick={onClose} />}
         </div>
         <div style={{ flex: 1, overflow: "auto" }}>{children}</div>
         {footer && (
-          <div style={{ borderTop: "1px solid var(--border)", padding: "16px 24px", background: "var(--bg-surface)" }}>
+          <div style={{ borderTop: "1px solid var(--border)", padding: "14px 20px", background: "var(--bg-surface)" }}>
             {footer}
           </div>
         )}

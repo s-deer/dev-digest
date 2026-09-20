@@ -149,6 +149,31 @@ Server tests split by filename: `*.it.test.ts` are DB-backed (testcontainers
 Postgres); everything else is hermetic. The browser e2e flows live in
 [`e2e/`](e2e/README.md) and run deterministically (no LLM).
 
+## Self-review before a PR
+
+Run `/pr-self-review` in Claude Code before opening a PR. It checks everything that differs from
+`origin/main`, including uncommitted and untracked files, in this order:
+
+1. Typecheck and hermetic tests of the touched packages.
+2. Whole-diff rules: schema changed without a migration, an applied migration edited, vendored
+   code touched, secrets added.
+3. A review by the matching project skills: UI skills on `client/`, onion/Fastify/Drizzle
+   skills on `server/`, and so on.
+
+Any confirmed **critical** finding blocks the PR. Details are in
+[`.claude/skills/pr-self-review/SKILL.md`](.claude/skills/pr-self-review/SKILL.md).
+
+The block is enforced in two places:
+- **Claude Code**: `.claude/settings.json` has a hook that refuses `gh pr create`,
+  `gh pr merge` and `git push` until the verdict for the current content is `PASS`.
+- **Your terminal**: enable the same gate for manual pushes, once per clone:
+
+  ```sh
+  git config core.hooksPath .githooks
+  ```
+
+The gate is local. `--no-verify` or a merge in the GitHub UI bypasses it.
+
 ## Troubleshooting
 
 - **`relation ... does not exist` / API errors on first run** — migrations weren't

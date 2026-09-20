@@ -8,7 +8,7 @@ import messages from "../../../../../../../../messages/en/runs.json"; // apps/we
 const TRACE: RunTrace = {
   config: { agent: "Security", version: "1", provider: "openai", model: "gpt-4.1", pr: 482, source: "local" },
   stats: { duration_ms: 8200, tokens_in: 12000, tokens_out: 1500, cost_usd: 0.0021, findings: 2, grounding: "2/2 passed" },
-  prompt_assembly: { system: "You are a reviewer.", skills: "### skill", memory: null, specs: null, user: "Review PR #482" },
+  prompt_assembly: { system: "You are a reviewer.", skills: "### skill", skills_tokens: 2, skill_blocks: [], memory: null, specs: null, user: "Review PR #482" },
   tool_calls: [{ tool: "review_file", args: "src/config.ts", meta: "single-pass", ms: 1200 }],
   raw_output: '{"verdict":"request_changes"}',
   memory_pulled: [{ pr: 471, text: "rate-limit public endpoints" }],
@@ -21,11 +21,12 @@ const TRACE: RunTrace = {
 
 // Swappable per test (e.g. a pre-feature trace with no stats.cost_usd).
 let currentTrace: RunTrace = TRACE;
+let currentLiveRunning = false;
 vi.mock("../../../../../../../lib/hooks/trace", () => ({
   useRunTrace: () => ({ data: currentTrace, isLoading: false }),
 }));
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
-  useRunEvents: () => ({ events: [], running: false }),
+  useRunEvents: () => ({ events: [], running: currentLiveRunning }),
 }));
 
 import RunTraceDrawer from "./RunTraceDrawer";
@@ -33,6 +34,7 @@ import RunTraceDrawer from "./RunTraceDrawer";
 afterEach(() => {
   cleanup();
   currentTrace = TRACE;
+  currentLiveRunning = false;
 });
 
 function renderWithIntl(ui: React.ReactElement) {
@@ -70,6 +72,15 @@ describe("A5 Run Trace drawer (smoke)", () => {
     renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
     fireEvent.click(screen.getByText("log"));
     // LiveLogStream renders its filter input
+    expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
+  });
+
+  it("opens on the live log while a run is still running", () => {
+    currentLiveRunning = true;
+    renderWithIntl(
+      <RunTraceDrawer runId="r1" agentName="Security" prNumber={482} running onClose={() => {}} />,
+    );
+    expect(screen.getByText(/Running/)).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
   });
 });

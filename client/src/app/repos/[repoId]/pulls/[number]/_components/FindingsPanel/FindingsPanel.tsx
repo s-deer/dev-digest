@@ -52,23 +52,35 @@ export function FindingsPanel({
     setFocusIdx(0);
   };
 
-  // j/k navigation + a/d shortcuts on the focused finding (keyboard).
-  React.useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "j") setFocusIdx((i) => Math.min(i + 1, shown.length - 1));
-      else if (e.key === "k") setFocusIdx((i) => Math.max(i - 1, 0));
-      else if (KEY_TO_ACTION[e.key] && shown[focusIdx]) {
-        action.mutate({ findingId: shown[focusIdx]!.id, action: KEY_TO_ACTION[e.key]!, prId });
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [shown, focusIdx, action, prId]);
+  // Handle shortcuts on the focused panel instead of globally. Multiple review
+  // accordions can be mounted at once, and global listeners make them all react.
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (
+      e.metaKey ||
+      e.ctrlKey ||
+      e.altKey ||
+      target.isContentEditable ||
+      ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName)
+    ) {
+      return;
+    }
+    if (shown.length === 0) return;
+
+    if (e.key === "j") setFocusIdx((i) => Math.min(i + 1, shown.length - 1));
+    else if (e.key === "k") setFocusIdx((i) => Math.max(i - 1, 0));
+    else if (KEY_TO_ACTION[e.key] && shown[focusIdx]) {
+      action.mutate({ findingId: shown[focusIdx]!.id, action: KEY_TO_ACTION[e.key]!, prId });
+    }
+  };
 
   return (
-    <div>
+    <div
+      role="region"
+      aria-label={t("panel.keyboardShortcuts")}
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+    >
       <div style={s.toolbar}>
         <SeverityPills counts={counts} active={activeSeverity} onToggle={toggleSeverity} />
         <div style={s.toggleGroup}>

@@ -64,3 +64,37 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — skills', () => {
+  const block = (name: string, order: number, tokens: number) => ({
+    skill_id: `id-${name}`,
+    name,
+    version: 2,
+    order,
+    tokens,
+    body: `Rule of ${name}.`,
+  });
+
+  it('renders one headed block per skill in `order` and records per-block tokens', () => {
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'DIFF',
+      skills: [block('second', 1, 5), block('first', 0, 4)],
+    });
+
+    const user = messages[1]!.content;
+    expect(user).toContain(
+      '## Skills / rules\n### Skill: first (v2)\nRule of first.\n\n### Skill: second (v2)\nRule of second.',
+    );
+    expect(assembly.skill_blocks.map((b) => b.name)).toEqual(['first', 'second']);
+    expect(assembly.skills_tokens).toBe(9);
+  });
+
+  it('omits the skills block and records zero tokens when no skill is resolved', () => {
+    const { messages, assembly } = assemblePrompt({ system: 'sys', diff: 'DIFF' });
+    expect(messages[1]!.content).not.toContain('## Skills / rules');
+    expect(assembly.skills).toBeNull();
+    expect(assembly.skill_blocks).toEqual([]);
+    expect(assembly.skills_tokens).toBe(0);
+  });
+});

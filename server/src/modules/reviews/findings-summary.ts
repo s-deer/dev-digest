@@ -1,5 +1,4 @@
 import type { FindingPreview, FindingsSummary, Severity } from '@devdigest/shared';
-import * as t from '../../db/schema.js';
 
 /**
  * Findings rollup for the PR list's FINDINGS column and the timeline badges
@@ -28,21 +27,6 @@ export interface FindingSummaryRow {
   rationale: string;
   dismissedAt: Date | null;
 }
-
-/** Drizzle select for a `FindingSummaryRow` minus `key` — callers add the key
- *  column (prId / runId) they group by. */
-export const findingSummaryColumns = {
-  id: t.findings.id,
-  severity: t.findings.severity,
-  category: t.findings.category,
-  title: t.findings.title,
-  file: t.findings.file,
-  startLine: t.findings.startLine,
-  endLine: t.findings.endLine,
-  confidence: t.findings.confidence,
-  rationale: t.findings.rationale,
-  dismissedAt: t.findings.dismissedAt,
-};
 
 export function emptyFindingsSummary(): FindingsSummary {
   return { counts: { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 }, items: [] };

@@ -1,0 +1,18 @@
+{
+  "name": "Conventions scan results are visible in Skills Lab",
+  "description": "Opens the seeded read-only convention scan and verifies evidence, confidence, triage controls, and ReScan without invoking a model.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the seeded workspace" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the seeded repository" },
+    { "cmd": ["find", "text", "Conventions", "click"], "label": "open Conventions from Skills Lab" },
+    { "cmd": ["wait", "--url", "/repos/"], "label": "conventions route reached" },
+    { "cmd": ["wait", "--text", "Conventions in acme/payments-api"], "label": "repository heading visible" },
+    { "cmd": ["wait", "--text", "Validate request bodies at the route boundary with the shared schema."], "label": "accepted convention visible" },
+    { "cmd": ["wait", "--text", "src/api/users.ts:18"], "label": "evidence path and line visible" },
+    { "cmd": ["wait", "--text", "94%"], "label": "confidence percentage visible" },
+    { "cmd": ["wait", "--text", "ReScan"], "label": "ReScan control visible" },
+    { "cmd": ["wait", "--text", "Create skill"], "label": "Create skill is available for the accepted candidate" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Rejected"], "label": "open rejected filter" },
+    { "cmd": ["wait", "--text", "No candidates in this filter"], "label": "rejected filter is empty in the seeded fixture" }
+  ]
+}

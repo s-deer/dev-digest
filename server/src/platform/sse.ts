@@ -22,6 +22,17 @@ export class RunBus {
   private seq = new Map<string, number>();
   private completed = new Set<string>();
   private cancelled = new Set<string>();
+  private active = new Set<string>();
+
+  /** Register the background executor for a run. */
+  start(runId: string): void {
+    this.active.add(runId);
+  }
+
+  /** Whether this process still has an executor for the run. */
+  isActive(runId: string): boolean {
+    return this.active.has(runId);
+  }
 
   /** Request cancellation of an in-flight run. The runner checks `isCancelled`
    *  at its next checkpoint (between map-reduce files) and stops. */
@@ -75,6 +86,7 @@ export class RunBus {
   /** Signal completion and release buffers/emitters. */
   complete(runId: string): void {
     const e = this.emitters.get(runId);
+    this.active.delete(runId);
     this.completed.add(runId);
     this.cancelled.delete(runId);
     e?.emit('done');

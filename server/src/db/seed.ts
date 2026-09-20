@@ -6,6 +6,8 @@ import {
   GENERAL_REVIEWER_PROMPT,
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
+  TEST_QUALITY_REVIEWER_PROMPT,
+  API_CONTRACT_REVIEWER_PROMPT,
 } from './seed-prompts.js';
 
 /** Default provider/model for the built-in reviewer agents. */
@@ -18,11 +20,11 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  *
  * Seeds: default workspace + system user + membership, default settings,
  * demo repo (acme/payments-api), PR #482 with files/commits, a sample review
- * with a few findings, and the three built-in agents (General + Security +
- * Performance), all on the default openrouter/deepseek-v4-flash provider+model.
+ * with a few findings, reusable demo skills, and the built-in reviewers, all on
+ * the default openrouter/deepseek-v4-flash provider+model.
  *
- * Course lessons populate the other tables (skills, conventions, memory, eval,
- * …) once their features are built — they start empty here.
+ * Course lessons populate the remaining tables (memory, eval, …) once their
+ * features are built; conventions include a small read-only demo scan below.
  */
 
 export const DEFAULT_WORKSPACE_NAME = 'default';
@@ -90,6 +92,75 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .returning();
   }
   const repoId = repo!.id;
+
+  // ---- convention extractor demo scan (read-only browser fixture) ---------
+  const demoScanId = '00000000-0000-0000-0000-000000000101';
+  await db
+    .insert(t.conventionScans)
+    .values({
+      id: demoScanId,
+      workspaceId,
+      repoId,
+      status: 'done',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      sampledFiles: ['package.json', 'src/api/users.ts', 'src/middleware/ratelimit.ts'],
+      proposed: 3,
+      kept: 3,
+      droppedUngrounded: 0,
+      droppedDuplicate: 0,
+      costUsd: 0.001,
+      startedAt: new Date('2026-09-19T08:00:00.000Z'),
+      finishedAt: new Date('2026-09-19T08:00:45.000Z'),
+    })
+    .onConflictDoNothing();
+  await db
+    .insert(t.conventions)
+    .values([
+      {
+        id: '00000000-0000-0000-0000-000000000111',
+        workspaceId,
+        repoId,
+        scanId: demoScanId,
+        category: 'api',
+        rule: 'Validate request bodies at the route boundary with the shared schema.',
+        rationale: 'Routes reject malformed input before service logic runs.',
+        evidencePath: 'src/api/users.ts',
+        evidenceLine: 18,
+        evidenceSnippet: 'schema: { body: CreateUserBody }',
+        confidence: 0.94,
+        status: 'accepted',
+      },
+      {
+        id: '00000000-0000-0000-0000-000000000112',
+        workspaceId,
+        repoId,
+        scanId: demoScanId,
+        category: 'errors',
+        rule: 'Translate domain failures into the shared error envelope.',
+        rationale: 'Clients can render stable error codes instead of parsing strings.',
+        evidencePath: 'src/api/users.ts',
+        evidenceLine: 31,
+        evidenceSnippet: 'throw new ValidationError("User is invalid")',
+        confidence: 0.88,
+        status: 'pending',
+      },
+      {
+        id: '00000000-0000-0000-0000-000000000113',
+        workspaceId,
+        repoId,
+        scanId: demoScanId,
+        category: 'structure',
+        rule: 'Keep external integrations behind injected adapters.',
+        rationale: 'Services remain testable without network credentials.',
+        evidencePath: 'src/middleware/ratelimit.ts',
+        evidenceLine: 9,
+        evidenceSnippet: 'constructor(private readonly limiter: RateLimiter) {}',
+        confidence: 0.82,
+        status: 'pending',
+      },
+    ])
+    .onConflictDoNothing();
 
   // ---- PR #482 (rate limiting) ----
   let [pr] = await db
@@ -175,7 +246,46 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
     ]);
   }
 
-  // ---- built-in agents (the three starter presets) ----
+  // ---- reusable demo skills -----------------------------------------------
+  const seedSkills: Array<typeof t.skills.$inferInsert> = [
+    {
+      workspaceId,
+      name: 'Test Quality Rubric',
+      description: 'Directs a reviewer to inspect test coverage, corner cases, mocks, and flakes.',
+      type: 'rubric',
+      source: 'manual',
+      body: `# Test quality\nInspect changed tests for untested branches and boundary values. Flag happy-path-only coverage when the changed production code has error, false, empty, or limit branches. Flag mocks that replace the behaviour under test and assertions that do not prove an observable result.`,
+      enabled: true,
+      version: 1,
+    },
+    {
+      workspaceId,
+      name: 'API Contract Compatibility',
+      description: 'Directs a reviewer to identify breaking route contract changes.',
+      type: 'convention',
+      source: 'extracted',
+      body: `# API contract compatibility\nTreat a changed route path, HTTP method, request field, response field, status code, or nullability as a potential breaking change. Flag it when the diff does not update every visible caller, contract, or migration path required to preserve compatibility.`,
+      enabled: true,
+      version: 1,
+    },
+  ];
+  for (const skill of seedSkills) {
+    const [existing] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, skill.name)));
+    if (!existing) {
+      // One transaction: a skill without its v1 snapshot is skipped by re-runs.
+      await db.transaction(async (tx) => {
+        const [created] = await tx.insert(t.skills).values(skill).returning();
+        await tx
+          .insert(t.skillVersions)
+          .values({ skillId: created!.id, version: 1, body: created!.body, note: 'Seeded demo skill' });
+      });
+    }
+  }
+
+  // ---- built-in agents -----------------------------------------------------
   // Prompt bodies live in ./seed-prompts.ts (mirrored in docs/agent-prompts/*.md).
   const seedAgents: Array<typeof t.agents.$inferInsert> = [
     {
@@ -211,6 +321,28 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description: 'Checks tests for missing branches, corner cases, brittle mocks, and flakes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
+    {
+      workspaceId,
+      name: 'API Contract Reviewer',
+      description: 'Detects breaking route and payload contract changes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: API_CONTRACT_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -219,6 +351,10 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
   }
+
+  // The demo skills stay UNATTACHED: the Test Quality / API Contract agents get
+  // their skills through the UI (create or import), and a run without skills is
+  // the control case of the skills experiment.
 
   return { workspaceId, userId };
 }

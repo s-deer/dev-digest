@@ -2,6 +2,7 @@ import type {
   Finding,
   LLMProvider,
   PromptAssembly,
+  PromptSkillBlock,
   Review,
   RunEventKind,
   UnifiedDiff,
@@ -52,8 +53,8 @@ export interface ReviewInput {
   llm: LLMProvider;
   /** 'auto' (default) picks single-pass unless the diff is large + multi-file. */
   strategy?: ReviewStrategy;
-  /** Resolved skill bodies (NOT slugs). */
-  skills?: string[];
+  /** Resolved, enabled skills in prompt order (bodies, NOT slugs). */
+  skills?: PromptSkillBlock[];
   /** Curated memory items. */
   memory?: string[];
   /** Project-context spec chunks (untrusted; delimiter-wrapped downstream). */

@@ -1,7 +1,8 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
-import type { Finding } from '@devdigest/shared';
+import type { Finding, FindingsSummary } from '@devdigest/shared';
+import { summarizeFindings } from '../findings-summary.js';
 import type { FindingRow, PullRow } from '../../../db/rows.js';
 
 export type ReviewRow = typeof t.reviews.$inferSelect;
@@ -14,6 +15,36 @@ export type ReviewRunUsage = {
 };
 
 // ---- reviews + findings ---------------------------------------------------
+
+/** Drizzle select for a `FindingSummaryRow` minus `key` — callers add the key
+ *  column (prId / runId / reviewId) they group by. */
+export const findingSummaryColumns = {
+  id: t.findings.id,
+  severity: t.findings.severity,
+  category: t.findings.category,
+  title: t.findings.title,
+  file: t.findings.file,
+  startLine: t.findings.startLine,
+  endLine: t.findings.endLine,
+  confidence: t.findings.confidence,
+  rationale: t.findings.rationale,
+  dismissedAt: t.findings.dismissedAt,
+};
+
+/** Severity breakdown + tooltip previews per review id (dismissed excluded).
+ *  Callers pass ids they already resolved through a workspace-scoped PR list. */
+export async function findingsSummaryForReviews(
+  db: Db,
+  reviewIds: string[],
+): Promise<Map<string, FindingsSummary>> {
+  if (reviewIds.length === 0) return new Map();
+  return summarizeFindings(
+    await db
+      .select({ key: t.findings.reviewId, ...findingSummaryColumns })
+      .from(t.findings)
+      .where(inArray(t.findings.reviewId, reviewIds)),
+  );
+}
 
 export async function insertReview(
   db: Db,
@@ -88,7 +119,9 @@ export async function reviewsForPull(
           .from(t.agentRuns)
           .where(inArray(t.agentRuns.id, runIds))
       : [];
-  const runById = new Map(runs.map(({ id, ...usage }) => [id, usage]));
+  const runById = new Map(
+    runs.map(({ id, costUsd, ...usage }) => [id, { ...usage, costUsd: costUsd == null ? null : Number(costUsd) }]),
+  );
   return reviews.map((review) => ({
     review,
     findings: findings.filter((f) => f.reviewId === review.id),

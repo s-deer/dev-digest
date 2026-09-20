@@ -90,8 +90,8 @@ Useful:
 | Candidate                                                    | Why it fails the gate                                   |
 | ------------------------------------------------------------ | ------------------------------------------------------- |
 | "Renamed `ReviewCard` to `ReviewSummaryCard`."                | Routine change, no lesson.                               |
-| "`NEXT_PUBLIC_API_BASE` is read at build time."               | Already in `client/CLAUDE.md` → not new.                 |
-| "Use `pnpm` in server, `npm` in reviewer-core."               | Already in root `CLAUDE.md`.                             |
+| "`NEXT_PUBLIC_API_BASE` is read at build time."               | Already in `client/AGENTS.md` → not new.                 |
+| "Use `pnpm` in server, `npm` in reviewer-core."               | Already in root `AGENTS.md`.                             |
 | "Async code can be tricky."                                   | Generic, not specific, not actionable.                   |
 | "Flow 03 might be flaky because of timing?"                   | Unverified hypothesis.                                   |
 | "The `foo` helper I added in this PR returns null on empty."  | Inferable from the code written in the same change.      |

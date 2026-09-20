@@ -1,13 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import type {
-  FindingsSummary,
-  PrMeta,
-  PrDetail,
-  GitHubClient,
-  PrReviewComment,
-} from '@devdigest/shared';
+import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
@@ -15,11 +9,7 @@ import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import { deriveReviewStatus } from './status.js';
 import { sumRunCosts } from './cost.js';
-import {
-  emptyFindingsSummary,
-  findingSummaryColumns,
-  summarizeFindings,
-} from '../reviews/findings-summary.js';
+import { emptyFindingsSummary } from '../reviews/findings-summary.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
@@ -145,27 +135,11 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     // FINDINGS column: severity breakdown + tooltip previews of the SAME latest
     // review the score comes from (not summed across re-runs), dismissed excluded.
     const latestReviewIds = [...latestReviewByPr.values()].map((rv) => rv.id);
-    const findingsByReview =
-      latestReviewIds.length > 0
-        ? summarizeFindings(
-            await container.db
-              .select({ key: t.findings.reviewId, ...findingSummaryColumns })
-              .from(t.findings)
-              .where(inArray(t.findings.reviewId, latestReviewIds)),
-          )
-        : new Map<string, FindingsSummary>();
+    const findingsByReview = await container.reviewRepo.findingsSummaryForReviews(latestReviewIds);
 
     // Total spend per PR for the list's COST column: sum of known run costs over
     // completed runs (same one IN-query + JS fold as the score above).
-    const costByPr =
-      prIds.length > 0
-        ? sumRunCosts(
-            await container.db
-              .select({ prId: t.agentRuns.prId, costUsd: t.agentRuns.costUsd })
-              .from(t.agentRuns)
-              .where(and(inArray(t.agentRuns.prId, prIds), eq(t.agentRuns.status, 'done'))),
-          )
-        : new Map<string, number>();
+    const costByPr = sumRunCosts(await container.reviewRepo.doneRunCostsForPulls(prIds));
 
     const now = Date.now();
     return rows.map((r) => {

@@ -17,7 +17,7 @@ export function Sidebar({ ctx }: { ctx: ShellContext }) {
         borderRight: "1px solid var(--border)",
         display: "flex",
         flexDirection: "column",
-        padding: "24px 14px 16px",
+        padding: "16px 10px 12px",
         gap: 2,
         overflow: "hidden",
       }}

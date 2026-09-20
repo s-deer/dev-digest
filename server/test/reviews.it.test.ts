@@ -61,6 +61,14 @@ const REVIEW_FIXTURE: Review = {
 };
 
 let repoSeq = 0;
+async function waitUntil(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const start = Date.now();
+  while (!predicate()) {
+    if (Date.now() - start > timeoutMs) throw new Error('Timed out waiting for test condition');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
 async function setupRepoAndPr(db: PgFixture['handle']['db'], workspaceId: string) {
   const name = `payments-api-${repoSeq++}`;
   const [repo] = await db
@@ -212,6 +220,107 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('adds only globally and per-agent enabled skills to the prompt trace in attachment order', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Skill runner', provider: 'openai', model: 'gpt-4.1', system_prompt: 'review' },
+      })
+    ).json();
+    const first = (
+      await app.inject({
+        method: 'POST',
+        url: '/skills',
+        payload: { name: 'First', description: 'First rule.', type: 'rubric', body: '# First skill' },
+      })
+    ).json();
+    const disabledForAgent = (
+      await app.inject({
+        method: 'POST',
+        url: '/skills',
+        payload: { name: 'Second', description: 'Second rule.', type: 'rubric', body: '# Second skill' },
+      })
+    ).json();
+    const disabledGlobally = (
+      await app.inject({
+        method: 'POST',
+        url: '/skills',
+        payload: { name: 'Third', description: 'Third rule.', type: 'rubric', body: '# Third skill', enabled: false },
+      })
+    ).json();
+    await app.inject({
+      method: 'POST',
+      url: `/agents/${agent.id}/skills`,
+      payload: {
+        links: [
+          { skill_id: first.id, enabled: true, order: 0 },
+          { skill_id: disabledForAgent.id, enabled: false, order: 1 },
+          { skill_id: disabledGlobally.id, enabled: true, order: 2 },
+        ],
+      },
+    });
+
+    const queued = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    const runId = queued.json().runs[0].run_id as string;
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+
+    expect(trace.prompt_assembly.skills).toBe('### Skill: First (v1)\n# First skill');
+    expect(trace.prompt_assembly.skill_blocks.map((b: { name: string }) => b.name)).toEqual(['First']);
+    expect(trace.prompt_assembly.skills_tokens).toBe(trace.prompt_assembly.skill_blocks[0].tokens);
+    expect(trace.prompt_assembly.skills_tokens).toBeGreaterThan(0);
+    expect(trace.log.some((line: { msg: string }) => line.msg.includes('skills: 1 enabled skill(s) attached'))).toBe(true);
+    expect(trace.log.some((line: { msg: string }) => line.msg.includes('skill[0]: First v1'))).toBe(true);
+    await app.close();
+  });
+
+  it('injects skill blocks in the attachment order, so reordering reorders the prompt', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Order runner', provider: 'openai', model: 'gpt-4.1', system_prompt: 'review' },
+      })
+    ).json();
+    const make = async (name: string) =>
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/skills',
+          payload: { name, description: `${name} rule.`, type: 'rubric', body: `# ${name}` },
+        })
+      ).json();
+    const alpha = await make('Alpha');
+    const beta = await make('Beta');
+
+    const blockNames = async (links: { skill_id: string; enabled: boolean; order: number }[]) => {
+      await app.inject({ method: 'POST', url: `/agents/${agent.id}/skills`, payload: { links } });
+      const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+      const queued = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+      await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+      const trace = (await app.inject({ method: 'GET', url: `/runs/${queued.json().runs[0].run_id}/trace` })).json();
+      return trace.prompt_assembly.skill_blocks.map((b: { name: string }) => b.name);
+    };
+
+    expect(
+      await blockNames([
+        { skill_id: alpha.id, enabled: true, order: 0 },
+        { skill_id: beta.id, enabled: true, order: 1 },
+      ]),
+    ).toEqual(['Alpha', 'Beta']);
+    expect(
+      await blockNames([
+        { skill_id: beta.id, enabled: true, order: 0 },
+        { skill_id: alpha.id, enabled: true, order: 1 },
+      ]),
+    ).toEqual(['Beta', 'Alpha']);
+    await app.close();
+  });
+
   it('records run cost + tokens and exposes them on runs, reviews, trace and the PR list', async () => {
     // MockLLMProvider reports tokensIn=100, tokensOut=50, costUsd=0.001 per call;
     // the one-file diff is reviewed in a single call.
@@ -293,6 +402,45 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     ).json();
     expect(reviews[0].findings).toHaveLength(1);
     expect(reviews[0].model).toBe('claude-x');
+    await app.close();
+  });
+
+  it('cancels an in-flight run without persisting a review or reverting to done', async () => {
+    const llm = new MockLLMProvider('openai', {
+      structured: REVIEW_FIXTURE,
+      structuredDelayMs: 250,
+    });
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        llm: { openai: llm },
+      },
+    });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'CancelAgent', provider: 'openai', model: 'gpt-4.1', system_prompt: 's' },
+      })
+    ).json();
+    const runId = (
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+    ).json().runs[0].run_id;
+
+    await waitUntil(() => llm.calls.some((call) => call.method === 'completeStructured'));
+    const cancelled = await app.inject({ method: 'POST', url: `/runs/${runId}/cancel` });
+    expect(cancelled.statusCode).toBe(200);
+
+    const runs = await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+    const run = runs.find((candidate) => candidate.id === runId);
+    expect(run?.status).toBe('cancelled');
+
+    const reviews = (await app.inject({ method: 'GET', url: `/pulls/${pr.id}/reviews` })).json();
+    expect(reviews).toHaveLength(0);
     await app.close();
   });
 

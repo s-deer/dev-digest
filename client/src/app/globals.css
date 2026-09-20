@@ -22,3 +22,102 @@
     transform: translateY(0);
   }
 }
+
+/* Block-level Markdown (skill bodies, PR descriptions). The vendored <Markdown>
+   styles inline elements only; the global reset flattens headings and lists. */
+.dd-md h1,
+.dd-md h2,
+.dd-md h3,
+.dd-md h4 {
+  margin: 16px 0 8px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+.dd-md > :first-child { margin-top: 0; }
+.dd-md h1 { font-size: 1.35em; }
+.dd-md h2 { font-size: 1.15em; }
+.dd-md h3,
+.dd-md h4 { font-size: 1em; }
+.dd-md ul,
+.dd-md ol { margin: 0 0 10px; padding-left: 1.4em; }
+.dd-md ul { list-style: disc; }
+.dd-md ol { list-style: decimal; }
+.dd-md li { margin: 2px 0; }
+.dd-md pre {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--bg-hover);
+}
+/* The primitive styles <code> inline; a code block must not inherit the pill look. */
+.dd-md pre code { padding: 0 !important; background: none !important; }
+.dd-md blockquote {
+  margin: 0 0 10px;
+  padding-left: 12px;
+  border-left: 3px solid var(--border-strong);
+  color: var(--text-secondary);
+}
+
+/* Conventions follows the fixed-width prototype on desktop and stacks its
+   action columns on narrow screens without changing the shared card system. */
+.dd-conventions-page {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  /* Skills switches between master and detail routes at small widths. The
+     application sidebar intentionally remains desktop-sized for now. */
+  .dd-skills-workspace[data-selected="false"] .dd-skills-empty {
+    display: none !important;
+  }
+
+  .dd-skills-workspace[data-selected="false"] .dd-skills-sidebar {
+    width: 100% !important;
+    border-right: none !important;
+  }
+
+  .dd-skills-workspace[data-selected="true"] .dd-skills-sidebar {
+    display: none !important;
+  }
+
+  .dd-skills-workspace[data-selected="true"] .dd-skill-detail {
+    width: 100%;
+  }
+
+  .dd-skill-mobile-back {
+    display: inline-flex !important;
+  }
+
+  .dd-conventions-page {
+    padding: 16px !important;
+  }
+
+  .dd-conventions-header {
+    flex-direction: column;
+  }
+
+  .dd-conventions-header > :last-child {
+    width: 100%;
+    justify-content: flex-start !important;
+  }
+
+  .dd-convention-card {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .dd-convention-card-actions {
+    min-width: 0 !important;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+  }
+
+  .dd-convention-card-actions > button {
+    flex: 1 1 130px;
+  }
+
+  .dd-conventions-modal-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+}

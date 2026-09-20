@@ -1,0 +1,19 @@
+{
+  "name": "Skills page: master list → inline skill tabs",
+  "description": "Read-only walk over the seeded skills: the master list renders, selecting a skill opens its inline Config panel, and the Preview and Versions tabs render the seeded v1. Nothing is created or saved, and no model is called.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/skills"], "label": "load the skills page" },
+    { "cmd": ["wait", "--url", "/skills"], "label": "skills route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "skills fetch settles" },
+    { "cmd": ["wait", "--text", "Test Quality Rubric"], "label": "seeded test-quality skill is visible" },
+    { "cmd": ["wait", "--text", "API Contract Compatibility"], "label": "seeded API-contract skill is visible" },
+    { "cmd": ["find", "text", "Test Quality Rubric", "click"], "label": "select the skill" },
+    { "cmd": ["wait", "--url", "/skills/"], "label": "skill detail route reached" },
+    { "cmd": ["wait", "--text", "Configuration"], "label": "Config panel is visible" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Preview"], "label": "switch to the Preview tab" },
+    { "cmd": ["wait", "--text", "Rendered as the reviewing agent receives it."], "label": "rendered preview is visible" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Versions"], "label": "switch to the Versions tab" },
+    { "cmd": ["wait", "--url", "tab=versioning"], "label": "versions tab in the URL" },
+    { "cmd": ["wait", "--text", "Seeded demo skill"], "label": "seeded v1 snapshot is listed" }
+  ]
+}

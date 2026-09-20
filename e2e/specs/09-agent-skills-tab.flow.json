@@ -1,0 +1,15 @@
+{
+  "name": "Agent editor Skills tab lists every workspace skill",
+  "description": "Opens the seeded Test Quality Reviewer, switches to the Skills tab, and confirms all workspace skills are listed (none attached by the seed). Read-only: no toggle, drag, or save.",
+  "steps": [
+    { "cmd": ["open", "{BASE}/agents"], "label": "load the agents page" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "agents fetch settles" },
+    { "cmd": ["find", "text", "Test Quality Reviewer", "click"], "label": "open the Test Quality Reviewer" },
+    { "cmd": ["wait", "--url", "/agents/"], "label": "agent editor reached" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Skills"], "label": "switch to the Skills tab" },
+    { "cmd": ["wait", "--url", "tab=skills"], "label": "skills tab in the URL" },
+    { "cmd": ["wait", "--text", "Drag enabled skills to reorder."], "label": "order hint is visible" },
+    { "cmd": ["wait", "--text", "Test Quality Rubric"], "label": "seeded skill listed" },
+    { "cmd": ["wait", "--text", "API Contract Compatibility"], "label": "second seeded skill listed" }
+  ]
+}

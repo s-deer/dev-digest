@@ -147,6 +147,14 @@ export class RepoIntelRepository {
     return row ?? null;
   }
 
+  async hasRepo(workspaceId: string, repoId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: t.repos.id })
+      .from(t.repos)
+      .where(and(eq(t.repos.workspaceId, workspaceId), eq(t.repos.id, repoId)));
+    return row !== undefined;
+  }
+
   /** All cached symbols for a repo (from blast's persistence). */
   async getCachedSymbols(repoId: string): Promise<CachedSymbolRow[]> {
     return this.db

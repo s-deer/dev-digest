@@ -4,13 +4,15 @@ import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 
+const mutate = vi.hoisted(() => vi.fn());
 vi.mock("../../../../../../../lib/hooks/reviews", () => ({
-  useFindingAction: () => ({ mutate: vi.fn(), isPending: false }),
+  useFindingAction: () => ({ mutate, isPending: false }),
 }));
 
 import { FindingsPanel } from "./FindingsPanel";
 
 afterEach(cleanup);
+afterEach(() => mutate.mockClear());
 
 const FINDINGS: FindingRecord[] = [
   {
@@ -108,5 +110,25 @@ describe("FindingsPanel — severity pills", () => {
     fireEvent.click(screen.getByRole("switch"));
     expect(pill(container, "CRITICAL")).toHaveTextContent("1 Critical");
     expect(shownTitles()).toEqual(["Crit one", "Warn one"]);
+  });
+});
+
+describe("FindingsPanel — keyboard scope", () => {
+  it("only handles shortcuts when the panel is focused and ignores modified keys", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS} prId="pr1" />);
+    const panel = screen.getByRole("region", { name: /findings list/i });
+
+    fireEvent.keyDown(window, { key: "d" });
+    expect(mutate).not.toHaveBeenCalled();
+
+    panel.focus();
+    fireEvent.keyDown(panel, { key: "d" });
+    expect(mutate).toHaveBeenCalledWith({ findingId: "f1", action: "dismiss", prId: "pr1" });
+
+    mutate.mockClear();
+    fireEvent.keyDown(panel, { key: "d", metaKey: true });
+    fireEvent.keyDown(panel, { key: "d", ctrlKey: true });
+    fireEvent.keyDown(panel, { key: "d", altKey: true });
+    expect(mutate).not.toHaveBeenCalled();
   });
 });

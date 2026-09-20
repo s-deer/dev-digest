@@ -28,6 +28,7 @@
   },
   "panel": {
     "hideLowConfidence": "Hide low confidence",
+    "keyboardShortcuts": "Findings list (focus to use j/k, a, and d)",
     "severityFilter": "Filter findings by severity",
     "severityPill": "{count} {severity}",
     "clearFilter": "Click again to show all findings",

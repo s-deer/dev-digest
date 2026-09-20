@@ -34,9 +34,16 @@ feeding it — `skills` (L02), `memory` (L07), `specs` (L05), `callers` — plus
 In the starter the server passes only the diff, system prompt, and repo map; the
 extra slots are omitted, so `assemblePrompt` simply leaves those sections out.
 
+**Skills** arrive as ordered `PromptSkillBlock[]` (already filtered to enabled
+ones, with a caller-computed `tokens`). Each renders as its own
+`### Skill: <name> (vN)` block under `## Skills / rules`, sorted by `order`, and
+is echoed in `assembly.skill_blocks` so the run trace shows one block per skill.
+`renderSkillBlock()` is exported so the caller counts tokens over the exact text
+the model sees.
+
 ## Public API
 
-Exported from `src/index.ts`: `assemblePrompt` / `wrapUntrusted` (prompt),
+Exported from `src/index.ts`: `assemblePrompt` / `renderSkillBlock` / `wrapUntrusted` (prompt),
 `groundFindings` / `groundingSummary` (grounding), `toJsonSchema` / `extractJson`
 / `parseWithRepair` (structured output), plus the `run` entrypoint and
 `reduce`. Contracts (`Review`, `Finding`, `Verdict`, …) come from
