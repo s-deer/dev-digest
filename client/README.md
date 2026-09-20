@@ -28,7 +28,7 @@ flowchart TD
   PULLS --> PR["/pulls/:number<br/>review detail<br/>(overview · diff · findings)"]
 
    AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills)"]
-   SKILLS["/skills<br/>skill grid · side preview · create / import"] --> SKILL["/skills/:id<br/>Config · Preview · Versioning"]
+    SKILLS["/skills<br/>skill master pane · create / import"] --> SKILL["/skills/:id<br/>Config · Preview · Versions"]
   SETTINGS["/settings/:section<br/>API keys · models"]
 
   PULLS -->|"GET /repos/:id/pulls · /repos/:id/index-state"| API

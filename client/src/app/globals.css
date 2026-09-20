@@ -67,6 +67,29 @@
 }
 
 @media (max-width: 720px) {
+  /* Skills switches between master and detail routes at small widths. The
+     application sidebar intentionally remains desktop-sized for now. */
+  .dd-skills-workspace[data-selected="false"] .dd-skills-empty {
+    display: none !important;
+  }
+
+  .dd-skills-workspace[data-selected="false"] .dd-skills-sidebar {
+    width: 100% !important;
+    border-right: none !important;
+  }
+
+  .dd-skills-workspace[data-selected="true"] .dd-skills-sidebar {
+    display: none !important;
+  }
+
+  .dd-skills-workspace[data-selected="true"] .dd-skill-detail {
+    width: 100%;
+  }
+
+  .dd-skill-mobile-back {
+    display: inline-flex !important;
+  }
+
   .dd-conventions-page {
     padding: 16px !important;
   }

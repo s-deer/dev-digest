@@ -7,6 +7,12 @@ changes; only record what would otherwise get re-discovered the hard way.
 
 ## What works
 
+### 2026-09-20 · API Contract Reviewer skills are repository fixtures, not seeded rows
+- **Context:** HW criterion 43 checks for four API Contract skills and explicitly allows skill files.
+- **Insight:** `docs/skills-library/{breaking-change,response-schema,semver-discipline,deprecation-policy}/SKILL.md` is the source fixture; the database seed intentionally keeps only two demo skills and does not import these files automatically.
+- **Do:** When auditing criterion 43, inspect `docs/skills-library` and verify each file's directive frontmatter plus Rule/Good/Bad sections; do not infer absence from `server/src/db/seed.ts`.
+- **Evidence:** `docs/skills-library/README.md:3-15`, the four `SKILL.md` files, and `tasks/skills/plan.md:197-201,259`.
+
 ### 2026-09-19 · Course features reverted from `main` still exist as full reference implementations in history
 - **Context:** starting a hw feature (conventions, skills, …) whose scaffolding (tables, contracts, i18n, mock seams) exists but whose module doesn't.
 - **Insight:** `c6af1e4 revert: restore main to the starter state` removed finished features, e.g. `641b637 feat(conventions)` with its spec, prompt, evidence gate and tests. The code targets old migrations and contracts, so it can't be cherry-picked, but its design and measured findings still apply.

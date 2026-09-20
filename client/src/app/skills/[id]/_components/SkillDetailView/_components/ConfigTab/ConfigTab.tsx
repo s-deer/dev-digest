@@ -3,7 +3,7 @@
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Button, Toggle } from "@devdigest/ui";
+import { Badge, Button, Toggle } from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
 import { useUpdateSkill } from "../../../../../../../lib/hooks/skills";
 import { useToast } from "../../../../../../../lib/toast";
@@ -34,9 +34,22 @@ export function ConfigTab({ skill }: { skill: Skill }) {
   return (
     <div style={s.wrap}>
       {deleting && <DeleteSkillModal skill={skill} onClose={() => setDeleting(false)} onDeleted={() => router.push("/skills")} />}
-      <div style={s.enabledRow}>
-        <span style={s.enabledLabel}>{t("config.enabled")}</span>
-        <Toggle on={skill.enabled} onChange={(enabled) => update.mutate({ id: skill.id, patch: { enabled } })} size={16} />
+      <div style={s.headingRow}>
+        <div style={s.headingGroup}>
+          <h2 style={s.heading}>{t("detail.configHeading")}</h2>
+          <Badge icon="GitCommit" mono>
+            {t("card.version", { version: skill.version })}
+          </Badge>
+        </div>
+        <div style={s.enabledGroup}>
+          <span style={s.enabledLabel}>{t("config.enabled")}</span>
+          <Toggle
+            ariaLabel={t("config.enabled")}
+            on={skill.enabled}
+            onChange={(enabled) => update.mutate({ id: skill.id, patch: { enabled } })}
+            size={16}
+          />
+        </div>
       </div>
       <SkillForm draft={draft} onChange={setDraft} bodyHint={t("config.bodyHint", { next: skill.version + 1 })} />
       <div style={s.actions}>

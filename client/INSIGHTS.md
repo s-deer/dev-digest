@@ -30,3 +30,9 @@ re-discovered the hard way.
 - **Insight:** Two top-level `card` objects parsed successfully, but the later object replaced the first and caused `next-intl` `MISSING_MESSAGE` errors for action labels.
 - **Do:** Keep each translation namespace unique and run a focused component test after editing message JSON; JSON parsing alone will not detect duplicate keys.
 - **Evidence:** `client/messages/en/conventions.json`, `ConventionCard.test.tsx`.
+
+### 2026-09-20 · Named controls need labels on the Toggle itself
+- **Context:** the skills sidebar toggle was wrapped in a labelled group, but its `role="switch"` button still had no accessible name.
+- **Insight:** A group label does not name its child switch, so role/name queries and screen readers identify it as an anonymous control.
+- **Do:** Pass `ariaLabel` to `@devdigest/ui` `Toggle`; its button forwards the value to `aria-label`.
+- **Evidence:** `client/src/vendor/ui/primitives/Toggle.tsx`, `SkillsSidebar.test.tsx`.

@@ -27,28 +27,34 @@ export function SkillDetailView({ skill, isLoading, isError, error, refetch, tab
 
   if (isError && error instanceof ApiError && error.status === 404) {
     return (
-      <EmptyState icon="Sparkles" title={t("detail.notFound.title")} body={t("detail.notFound.body")} />
+      <div className="dd-skill-detail" style={s.state}>
+        <EmptyState icon="Sparkles" title={t("detail.notFound.title")} body={t("detail.notFound.body")} />
+      </div>
     );
   }
   if (isError) {
     return (
-      <ErrorState fullScreen body={t("detail.loadError")} onRetry={() => refetch()} />
+      <div className="dd-skill-detail" style={s.state}>
+        <ErrorState fullScreen body={t("detail.loadError")} onRetry={() => refetch()} />
+      </div>
     );
   }
 
   return (
     <>
       {isLoading || !skill ? (
-        <div style={s.loading}>
+        <div className="dd-skill-detail" style={s.loading}>
           <Skeleton height={24} width={240} />
           <Skeleton height={220} />
         </div>
       ) : (
-        <div style={s.wrap}>
+        <div className="dd-skill-detail" style={s.wrap}>
           <div style={s.header}>
-            <Link href="/skills" style={s.back} aria-label={t("page.crumbSkills")}>
+            <Link href="/skills" className="dd-skill-mobile-back" style={s.mobileBack} aria-label={t("page.crumbSkills")}>
               <Icon.ChevronLeft size={14} />
+              {t("page.crumbSkills")}
             </Link>
+            <Icon.Sparkles size={18} style={s.icon} />
             <h1 className="mono" style={s.name}>
               {skill.name}
             </h1>
@@ -56,7 +62,6 @@ export function SkillDetailView({ skill, isLoading, isError, error, refetch, tab
             <Badge icon="GitCommit" mono>
               {t("card.version", { version: skill.version })}
             </Badge>
-            <Badge icon="Cpu">{t("card.agents", { count: skill.agent_count })}</Badge>
           </div>
           <div style={s.tabs}>
             <Tabs

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AppShell } from "../../../components/app-shell";
 import { useSkill } from "../../../lib/hooks/skills";
+import { SkillsWorkspace } from "../_components/SkillsWorkspace";
 import { SkillDetailView } from "./_components/SkillDetailView";
 import { TAB_KEYS, type SkillTabKey } from "./_components/SkillDetailView/constants";
 
@@ -24,15 +25,17 @@ export default function SkillDetailPage() {
 
   return (
     <AppShell crumb={crumb}>
-      <SkillDetailView
-        skill={skill}
-        isLoading={isLoading}
-        isError={isError}
-        error={error}
-        refetch={refetch}
-        tab={tab}
-        onTab={(next) => router.replace(`/skills/${id}?tab=${next}`)}
-      />
+      <SkillsWorkspace activeId={id} activeTab={tab}>
+        <SkillDetailView
+          skill={skill}
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          refetch={refetch}
+          tab={tab}
+          onTab={(next) => router.replace(`/skills/${id}?tab=${next}`)}
+        />
+      </SkillsWorkspace>
     </AppShell>
   );
 }
