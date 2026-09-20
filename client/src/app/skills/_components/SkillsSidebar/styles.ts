@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 
 export const s = {
   sidebar: {
-    width: 280,
+    width: 340,
     flexShrink: 0,
     display: "flex",
     flexDirection: "column",

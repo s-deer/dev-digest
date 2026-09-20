@@ -47,6 +47,8 @@ describe("SkillsSidebar", () => {
   it("filters skills, selects a card, toggles it, and opens both Add Skill actions", () => {
     renderSidebar({ activeId: "sk1" });
     expect(screen.getByRole("button", { name: "boundary-cases" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("2 agents")).toBeInTheDocument();
+    expect(screen.getByText("No agents")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "breaking-change" }));
     expect(callbacks.select).toHaveBeenCalledWith("sk2");

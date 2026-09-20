@@ -46,6 +46,7 @@ export function SkillSidebarCard({
       <div style={s.badges}>
         <SkillTypeBadge type={skill.type} label={t(`type.${skill.type}`)} />
         <Badge icon={SOURCE_ICONS[skill.source]}>{t(`source.${skill.source}`)}</Badge>
+        <Badge icon="Cpu">{t("card.agents", { count: skill.agent_count })}</Badge>
       </div>
     </article>
   );
