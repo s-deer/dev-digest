@@ -19,6 +19,14 @@ changes; only record what would otherwise get re-discovered the hard way.
 - **Do:** Before designing, run `git log --all --oneline -- '*<feature>*'` and read the reverted commit's `docs/specs/*.md`. Reuse the design and prompts; rewrite the code on the current branch.
 - **Evidence:** `git show 641b637:docs/specs/conventions.md`; `tasks/conventions/spec.md`.
 
+## Decisions
+
+### 2026-09-26 · `.claude/agents/**` is written in English only, whatever language the request uses
+- **Context:** creating or editing subagent definitions or `.claude/agents/README.md`; tasks often arrive in Ukrainian, and every agent has the rule "Reply in the language of the request".
+- **Insight:** The user rejected a Ukrainian `README.md` for the agents and had it rewritten in English. The reply-language rule covers agent *messages*, not the repo files that define agents.
+- **Do:** ALWAYS write `.claude/agents/*.md` content in English; NEVER translate it to match the request language.
+- **Evidence:** `.claude/agents/README.md` (rewritten 2026-09-26 on user request).
+
 ## Gotchas & recurring errors
 
 ### 2026-09-19 · The pr-self-review hook denies any Bash command whose text contains `gh pr create`/`gh pr merge`/`git push`
