@@ -105,3 +105,32 @@ describe('pricing / cost discipline', () => {
     expect(estimateCost('some-future-model', 1000, 1000)).toBeNull();
   });
 });
+
+describe('mock adapter semantics for the Intent Layer', () => {
+  it('MockGitClient.readFileAt returns the fixture keyed by ref:path, throws otherwise', async () => {
+    const git = new MockGitClient({ filesAt: { 'abc1234:docs/plan.md': '# The plan' } });
+    await expect(git.readFileAt({ owner: 'a', name: 'b' }, 'abc1234', 'docs/plan.md')).resolves.toBe(
+      '# The plan',
+    );
+    await expect(git.readFileAt({ owner: 'a', name: 'b' }, 'abc1234', 'docs/missing.md')).rejects.toThrow();
+  });
+
+  it('MockGitHubClient.getIssue returns a fixture or throws when `issues` is configured, and counts calls', async () => {
+    const gh = new MockGitHubClient({ issues: { 471: { number: 471, title: 'Bug', body: 'x', state: 'open' } } });
+    await expect(gh.getIssue({ owner: 'a', name: 'b' }, 471)).resolves.toMatchObject({ number: 471 });
+    await expect(gh.getIssue({ owner: 'a', name: 'b' }, 999)).rejects.toThrow();
+    expect(gh.issueCalls).toEqual([471, 999]);
+  });
+
+  it('MockGitHubClient.getFileContent returns the fixture or null for a missing path, and counts calls', async () => {
+    const gh = new MockGitHubClient({ contents: { 'docs/plan.md': '# The plan' } });
+    await expect(gh.getFileContent({ owner: 'a', name: 'b' }, 'docs/plan.md', 'abc1234')).resolves.toBe(
+      '# The plan',
+    );
+    await expect(gh.getFileContent({ owner: 'a', name: 'b' }, 'docs/missing.md', 'abc1234')).resolves.toBeNull();
+    expect(gh.contentCalls).toEqual([
+      { path: 'docs/plan.md', ref: 'abc1234' },
+      { path: 'docs/missing.md', ref: 'abc1234' },
+    ]);
+  });
+});

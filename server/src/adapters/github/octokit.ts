@@ -363,6 +363,31 @@ export class OctokitGitHubClient implements GitHubClient {
     };
   }
 
+  async getFileContent(repo: RepoRef, path: string, ref: string): Promise<string | null> {
+    try {
+      const res = await withRetry(() =>
+        withTimeout(
+          this.octokit.rest.repos.getContent({
+            owner: repo.owner,
+            repo: repo.name,
+            path,
+            ref,
+          }),
+          TIMEOUT,
+        ),
+      );
+      const data = res.data;
+      if (Array.isArray(data) || data.type !== 'file' || typeof data.content !== 'string') {
+        // directory listing, symlink, or submodule — not a readable file.
+        return null;
+      }
+      return Buffer.from(data.content, 'base64').toString('utf8');
+    } catch (err) {
+      if ((err as { status?: number })?.status === 404) return null;
+      throw err;
+    }
+  }
+
   async currentLogin(): Promise<string> {
     const res = await withRetry(() =>
       withTimeout(this.octokit.rest.users.getAuthenticated(), TIMEOUT),

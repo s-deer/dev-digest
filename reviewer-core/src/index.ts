@@ -15,6 +15,7 @@
 export {
   assemblePrompt,
   renderSkillBlock,
+  renderIntentSection,
   wrapUntrusted,
   type PromptParts,
   type AssembledPrompt,

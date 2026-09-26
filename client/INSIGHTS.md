@@ -36,3 +36,15 @@ re-discovered the hard way.
 - **Insight:** A group label does not name its child switch, so role/name queries and screen readers identify it as an anonymous control.
 - **Do:** Pass `ariaLabel` to `@devdigest/ui` `Toggle`; its button forwards the value to `aria-label`.
 - **Evidence:** `client/src/vendor/ui/primitives/Toggle.tsx`, `SkillsSidebar.test.tsx`.
+
+### 2026-09-26 · RunTraceDrawer's "Prompt assembly" section starts collapsed
+- **Context:** adding an assertion for a new `PromptBlock` (the derived PR intent) inside `TraceBody`'s "Prompt assembly" section.
+- **Insight:** `TraceSection` for "Prompt assembly" is rendered with `defaultOpen={false}` (unlike Configuration/Stats), so its children — every `PromptBlock` label — are not in the DOM until the section header is clicked. A `getByText` on a prompt-block label fails even though the block is correctly conditionally rendered by the parent.
+- **Do:** `fireEvent.click(screen.getByText("Prompt assembly"))` before asserting on any `PromptBlock` label in a `RunTraceDrawer` test.
+- **Evidence:** `client/src/app/repos/[repoId]/pulls/[number]/_components/RunTraceDrawer/_components/TraceBody/TraceBody.tsx:75`, `RunTraceDrawer.test.tsx`.
+
+### 2026-09-26 · A disabled TanStack Query keeps `isPending: true` forever, so `isLoading || isPending` never resolves
+- **Context:** `IntentCard` showed an endless skeleton whenever `prId` was `null` (e.g. before the PR-number → uuid lookup resolved).
+- **Insight:** `usePrIntent`'s `useQuery` uses `enabled: !!prId`. With `enabled:false`, TanStack Query v5 never fetches, so `isPending` stays `true` indefinitely — but `isLoading` (`isPending && isFetching`) correctly stays `false`. Gating the skeleton on `isLoading || isPending` therefore never leaves the loading state once `prId` becomes available with no data yet, and shows it forever while `prId` is `null`.
+- **Do:** For a query disabled on a nullable key, branch on `!key || isLoading` and drop `isPending` from the loading condition entirely.
+- **Evidence:** `client/src/app/repos/[repoId]/pulls/[number]/_components/IntentCard/IntentCard.tsx`, `client/src/lib/hooks/intent.ts`.

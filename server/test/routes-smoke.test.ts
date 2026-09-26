@@ -65,6 +65,17 @@ describe('routes (no DB)', () => {
     await app.close();
   });
 
+  it('POST /pulls/:id/intent rejects a malformed body before the handler runs', async () => {
+    const app = await buildApp({ config });
+    const url = '/pulls/00000000-0000-4000-8000-000000000000/intent';
+    const badType = await app.inject({ method: 'POST', url, payload: { force: 'yes' } });
+    expect(badType.statusCode).toBe(422);
+    expect(badType.json().error.code).toBe('validation_error');
+    const extraKey = await app.inject({ method: 'POST', url, payload: { force: true, model: 'x' } });
+    expect(extraKey.statusCode).toBe(422);
+    await app.close();
+  });
+
   it('rejects malformed base64 lengths at the request boundary', async () => {
     const app = await buildApp({ config });
     const res = await app.inject({

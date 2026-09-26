@@ -138,8 +138,13 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     const findingsByReview = await container.reviewRepo.findingsSummaryForReviews(latestReviewIds);
 
     // Total spend per PR for the list's COST column: sum of known run costs over
-    // completed runs (same one IN-query + JS fold as the score above).
-    const costByPr = sumRunCosts(await container.reviewRepo.doneRunCostsForPulls(prIds));
+    // completed runs (same one IN-query + JS fold as the score above), plus the
+    // Intent Layer's cached derivation cost (`pr_intent.cost_usd_total` — billed
+    // once per PR, not per agent run).
+    const costByPr = sumRunCosts([
+      ...(await container.reviewRepo.doneRunCostsForPulls(prIds)),
+      ...(await container.intentRepo.costsForPulls(workspaceId, prIds)),
+    ]);
 
     const now = Date.now();
     return rows.map((r) => {

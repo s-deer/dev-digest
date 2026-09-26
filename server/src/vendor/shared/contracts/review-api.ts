@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Finding, Verdict } from './findings.js';
-import { Intent, SmartDiff } from './brief.js';
+import { PrIntent, SmartDiff } from './brief.js';
 
 /**
  * A2 — Review-Core API surface contracts. These extend the core
@@ -61,9 +61,41 @@ export const ReviewRunResponse = z.object({
 });
 export type ReviewRunResponse = z.infer<typeof ReviewRunResponse>;
 
-/** Intent persisted for a PR (the Intent plus the pr_id it scopes). */
-export const PrIntentRecord = Intent.extend({ pr_id: z.string() });
+/**
+ * Persisted PR intent (Intent Layer / L03): the derived `PrIntent` plus the
+ * cache key (`pr_id` + `head_sha`), staleness, and the provider/model/cost
+ * that produced it.
+ */
+export const PrIntentRecord = PrIntent.extend({
+  pr_id: z.string(),
+  head_sha: z.string(),
+  /** True when `head_sha` no longer matches the PR's current head. */
+  stale: z.boolean(),
+  provider: z.string(),
+  model: z.string(),
+  tokens_in: z.number().int(),
+  tokens_out: z.number().int(),
+  /** Cost of the single LLM call that produced this intent; null when unpriced. */
+  cost_usd: z.number().nullable(),
+  /** Running total across every (re)generation of this PR's intent. */
+  cost_usd_total: z.number().nullable(),
+  updated_at: z.string(),
+});
 export type PrIntentRecord = z.infer<typeof PrIntentRecord>;
+
+/** Response of `GET /pulls/:id/intent`; `intent` is null before the first generation. */
+export const PrIntentResponse = z.object({
+  intent: PrIntentRecord.nullable(),
+});
+export type PrIntentResponse = z.infer<typeof PrIntentResponse>;
+
+/** Body of `POST /pulls/:id/intent`; `force` bypasses the head_sha/inputs_hash cache. */
+export const GenerateIntentBody = z
+  .object({
+    force: z.boolean().default(false),
+  })
+  .strict();
+export type GenerateIntentBody = z.infer<typeof GenerateIntentBody>;
 
 /** Smart-diff response for a PR (the SmartDiff). */
 export const SmartDiffResponse = SmartDiff;

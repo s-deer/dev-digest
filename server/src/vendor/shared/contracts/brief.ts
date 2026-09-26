@@ -13,6 +13,56 @@ export const Intent = z.object({
 });
 export type Intent = z.infer<typeof Intent>;
 
+// ---- PR intent (Intent Layer / L03) ----
+export const IntentChangeType = z.enum([
+  'feature',
+  'bugfix',
+  'refactor',
+  'perf',
+  'security',
+  'docs',
+  'test',
+  'chore',
+  'deps',
+  'config',
+  'other',
+]);
+export type IntentChangeType = z.infer<typeof IntentChangeType>;
+
+export const IntentConfidence = z.enum(['high', 'medium', 'low']);
+export type IntentConfidence = z.infer<typeof IntentConfidence>;
+
+export const IntentSourceKind = z.enum([
+  'title',
+  'description',
+  'issue',
+  'plan',
+  'spec',
+  'branch',
+  'commits',
+  'files',
+  'external_ref',
+]);
+export type IntentSourceKind = z.infer<typeof IntentSourceKind>;
+
+export const IntentSource = z.object({
+  kind: IntentSourceKind,
+  ref: z.string(),
+  fetched: z.boolean(),
+  note: z.string().nullish(),
+});
+export type IntentSource = z.infer<typeof IntentSource>;
+
+/** Intent derived once per PR (per head SHA), with change type, confidence, and sources. */
+export const PrIntent = Intent.extend({
+  change_type: IntentChangeType,
+  confidence: IntentConfidence,
+  confidence_score: z.number().min(0).max(1),
+  sources: z.array(IntentSource),
+  missing_docs: z.boolean(),
+});
+export type PrIntent = z.infer<typeof PrIntent>;
+
 // ---- Blast radius ----
 export const ChangedSymbol = z.object({
   name: z.string(),

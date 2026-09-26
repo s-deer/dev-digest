@@ -27,6 +27,9 @@ import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
 import { RepoRepository } from '../modules/repos/repository.js';
 import { SkillsRepository } from '../modules/skills/repository.js';
+import { IntentRepository } from '../modules/intent/repository.js';
+import { IntentService } from '../modules/intent/service.js';
+import { resolveFeatureModel } from '../modules/settings/feature-models.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
@@ -76,6 +79,8 @@ export class Container {
   private _reposRepo?: RepoRepository;
   private _skillsRepo?: SkillsRepository;
   private _reviewRepo?: ReviewRepository;
+  private _intentRepo?: IntentRepository;
+  private _intentService?: IntentService;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -110,6 +115,21 @@ export class Container {
 
   get reviewRepo(): ReviewRepository {
     return (this._reviewRepo ??= new ReviewRepository(this.db));
+  }
+
+  get intentRepo(): IntentRepository {
+    return (this._intentRepo ??= new IntentRepository(this.db));
+  }
+
+  /** IntentService (L03) — narrow deps, no `Container` (see onion-architecture). */
+  get intentService(): IntentService {
+    return (this._intentService ??= new IntentService({
+      intents: this.intentRepo,
+      github: () => this.github(),
+      git: this.git,
+      resolveModel: (workspaceId) => resolveFeatureModel(this, workspaceId, 'review_intent'),
+      llm: (provider) => this.llm(provider),
+    }));
   }
 
   get codeIndex(): CodeIndex {

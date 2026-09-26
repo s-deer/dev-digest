@@ -24,8 +24,12 @@ stateDiagram-v2
    (`src/modules/reviews/service.ts:120`, `repository/run.repo.ts:139`), so the
    HTTP response carries run ids the client can subscribe to right away.
 2. **Background execution.** The executor is fired without `await`
-   (`service.ts:133`). Shared pre-work (diff load) runs once. If it fails,
-   `failAll` fails every queued run (`src/modules/reviews/run-executor.ts:75`).
+   (`service.ts:133`). Shared pre-work runs once for the whole batch: the diff
+   load, then deriving the PR intent (cached per head SHA — see
+   [`intent-layer.md`](intent-layer.md)) via `IntentDeriver.ensure`
+   (`run-executor.ts:138-189`). A diff-load failure fails every queued run via
+   `failAll` (`run-executor.ts:75`); an intent-derivation failure only logs
+   `intent: skipped` and the batch reviews without it — it never fails a run.
 3. **Per agent** (`runOneAgent`): resolve the provider (a missing key throws
    here and becomes a failed run), build the optional repo-intel context, then
    call `reviewPullRequest` from `@devdigest/reviewer-core` (`run-executor.ts:191`).
@@ -65,6 +69,7 @@ instance per database.
 | `GET /pulls/:id/runs` | per-run `cost_usd` (Timeline) | `run.repo.ts:45` |
 | `GET /pulls/:id/reviews` | per-review `cost_usd`, joined through `reviews.run_id` | `repository/review.repo.ts:95`, `helpers.ts:78` |
 | `GET /repos/:id/pulls` | **total** per PR | `src/modules/pulls/routes.ts:160` |
+| `pr_intent.cost_usd_total` | running total across every (re)generation of the PR's Intent Layer derivation; folded into the PR total, never into `agent_runs` | `src/modules/intent/repository.ts:158-168`; see [`intent-layer.md`](intent-layer.md#cost-accounting) |
 
 The engine computes the number (see
 [`llm-provider-and-cost.md`](../../reviewer-core/docs/llm-provider-and-cost.md)).
@@ -72,13 +77,19 @@ The server never re-prices a finished run; it stores what the engine returned.
 
 ### PR list total
 
-`sumRunCosts` (`src/modules/pulls/cost.ts`) folds rows already filtered to
-`status='done'` (`routes.ts:166`):
+The PR total is **done-run costs plus the Intent Layer's one row per PR**:
+`sumRunCosts` (`src/modules/pulls/cost.ts:12-21`) folds two sources together —
+`doneRunCostsForPulls` (rows already filtered to `status='done'`,
+`routes.ts:145`) and `IntentRepository.costsForPulls` (`pr_intent.cost_usd_total`,
+`routes.ts:146`) — into one `{prId, costUsd}` map (`modules/pulls/routes.ts:144-147`):
 
-- Runs with `cost_usd = null` are **skipped**, so they don't turn the whole sum
+- Rows with `cost_usd = null` are **skipped**, so they don't turn the whole sum
   into `null`.
 - A PR with no known cost at all is missing from the map, so the route returns
   `null` and the UI shows "—", never `$0`.
+- The intent cost is billed **once per PR** (per head SHA, cached), never
+  denormalized into `agent_runs` — see
+  [`intent-layer.md`](intent-layer.md#cost-accounting).
 
 ### Things that surprise people
 

@@ -33,6 +33,7 @@ page.tsx / _components   →   src/lib/hooks/*.ts   →   src/lib/api.ts   →  
 | Live review banner | `usePrActiveRuns` (`reviews.ts:28`) + `useRunEvents` (SSE) | `["pr-active-runs", prId]` | `GET /pulls/:id/runs/active`, `GET /runs/:id/events` | every 4 s while non-empty |
 | Trace drawer stats, prompt, log | `useRunTrace` (`hooks/trace.ts:12`) | `["run-trace", runId]` | `GET /runs/:id/trace` | — |
 | Trace drawer **findings** | *no fetch*: taken from `usePrReviews` data | — | — | — |
+| Overview **Intent** card | `usePrIntent` (`hooks/intent.ts:12`) | `["pr-intent", prId]` | `GET /pulls/:id/intent` | on invalidation |
 
 The tab is in the URL: `?tab=findings` is the tab labelled **"Agent runs"**
 (`_components/PrDetailHeader/PrDetailHeader.tsx:117`). The open trace is
@@ -48,10 +49,11 @@ review) shows an empty findings section even though the trace exists.
 | Mutation | Invalidates |
 | --- | --- |
 | `useRunReview` (`reviews.ts:124`) | `["reviews", prId]`; the header's `onRunsStarted` also invalidates active runs |
-| run finished (`onRunDone` in `page.tsx`) | active runs, `["pr-runs"]`, refetch reviews |
+| run finished (`onRunDone` in `page.tsx`) | active runs, `["pr-runs"]`, refetch reviews, `["pr-intent", prId]` (`page.tsx:160`) |
 | `useDeleteRun` (`reviews.ts:60`) | `["pr-runs"]`, `["reviews"]` |
 | `useDeleteReview` (`reviews.ts:81`) | `["reviews"]` only |
 | `useFindingAction` accept/dismiss (`reviews.ts:139`) | `["reviews", prId]` **only** |
+| `useGenerateIntent` (`hooks/intent.ts:22-31`) | sets `["pr-intent", prId]` to the fresh record directly (`setQueryData`, no refetch), and invalidates `["pulls"]` so the PR list's COST column picks up the new `cost_usd_total` |
 
 ### Known staleness
 

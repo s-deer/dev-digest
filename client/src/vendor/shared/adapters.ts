@@ -133,6 +133,12 @@ export interface GitHubClient {
   ): Promise<PrReviewComment>;
   openPullRequest(repo: RepoRef, payload: OpenPrPayload): Promise<{ url: string }>;
   getIssue(repo: RepoRef, n: number): Promise<IssueMeta>;
+  /**
+   * Read a file's content at `ref` via the GitHub contents API (fallback for
+   * `GitClient.readFileAt` when the local clone doesn't have `ref` yet).
+   * Returns null on 404, or when `path` is a directory / not a file.
+   */
+  getFileContent(repo: RepoRef, path: string, ref: string): Promise<string | null>;
   /** GET /user — for "posting as @user". */
   currentLogin(): Promise<string>;
 }
@@ -181,6 +187,12 @@ export interface GitClient {
   blame(repo: RepoRef, path: string): Promise<BlameLine[]>;
   log(repo: RepoRef, path?: string): Promise<GitCommit[]>;
   readFile(repo: RepoRef, path: string): Promise<string>;
+  /**
+   * Read a file's content at a specific commit (`git show <ref>:<path>`),
+   * without checking out or requiring the local working tree to be at `ref`.
+   * Throws if the file does not exist at `ref`.
+   */
+  readFileAt(repo: RepoRef, ref: string, path: string): Promise<string>;
   clonePathFor(repo: RepoRef): string;
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { LLMProvider, StructuredResult } from '@devdigest/shared';
+import type { LLMProvider, PrIntent, StructuredResult } from '@devdigest/shared';
 import { MockLLMProvider, MockGitClient } from '../../server/src/adapters/mocks.js';
 import { parseUnifiedDiff } from '../../server/src/adapters/git/diff-parser.js';
 import { reviewPullRequest } from '../src/index.js';
@@ -161,6 +161,33 @@ describe('reviewPullRequest (engine)', () => {
     const partlyUnpriced = await run([0.001, null]);
     expect(partlyUnpriced.tokensIn).toBe(2000);
     expect(partlyUnpriced.costUsd).toBeNull();
+  });
+
+  it('passes the derived intent through to the prompt assembly', async () => {
+    const intent: PrIntent = {
+      intent: 'Add rate limiting to the public API endpoints.',
+      in_scope: ['Add a token-bucket limiter to /api/*'],
+      out_of_scope: [],
+      change_type: 'feature',
+      confidence: 'medium',
+      confidence_score: 0.6,
+      sources: [{ kind: 'issue', ref: '471', fetched: true, note: null }],
+      missing_docs: false,
+    };
+    const llm = new MockLLMProvider('openai', { structured: fixture });
+    const diff = await new MockGitClient().diff();
+
+    const outcome = await reviewPullRequest({
+      systemPrompt: 'security reviewer',
+      model: 'gpt-4.1',
+      diff,
+      llm,
+      intent,
+    });
+
+    expect(outcome.assembly.intent).toContain('<untrusted source="pr-intent">');
+    expect(outcome.assembly.intent).toContain('Add rate limiting to the public API endpoints.');
+    expect(outcome.assembly.user).toContain('## PR intent (derived)');
   });
 
   it('forwards sessionId to every LLM call (OpenRouter session grouping)', async () => {

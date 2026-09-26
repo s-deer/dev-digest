@@ -60,6 +60,16 @@ const REVIEW_FIXTURE: Review = {
   ],
 };
 
+/** Structured-output fixture for the intent module's `completeStructured({schemaName: 'PrIntent'})` call. */
+const INTENT_FIXTURE = {
+  evidence: [{ source_ref: 'issue #471', quote: 'Public endpoints get hammered without limits.' }],
+  intent: 'Prevent abuse of public endpoints by unauthenticated clients.',
+  in_scope: ['Add a rate limiting middleware'],
+  out_of_scope: [],
+  change_type: 'feature',
+  self_confidence: 'medium',
+};
+
 let repoSeq = 0;
 async function waitUntil(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
   const start = Date.now();
@@ -125,8 +135,15 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
       overrides: {
         embedder: new MockEmbedder(),
         git: new MockGitClient({ diff: DIFF }),
+        github: new MockGitHubClient(),
         llm: {
           [provider]: new MockLLMProvider(provider, { structured }),
+          // Shared pre-work (Intent Layer / L03) always resolves 'openrouter' —
+          // mock it here too so these review-focused tests stay hermetic
+          // instead of falling through to a real key. The empty default
+          // fixture fails PrIntent validation, which is fine: intent is
+          // logged as skipped and the review proceeds without it.
+          openrouter: new MockLLMProvider('openrouter'),
         },
       },
     });
@@ -328,7 +345,13 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     const app = await buildApp({
       config: config(),
       db: pg.handle.db,
-      overrides: { ...overrides, llm: { openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }) } },
+      overrides: {
+        ...overrides,
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }),
+          openrouter: new MockLLMProvider('openrouter'),
+        },
+      },
     });
     const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
     const agent = (
@@ -368,7 +391,13 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     const failing = await buildApp({
       config: config(),
       db: pg.handle.db,
-      overrides: { ...overrides, llm: { openai: new MockLLMProvider('openai', { structured: {} }) } },
+      overrides: {
+        ...overrides,
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: {} }),
+          openrouter: new MockLLMProvider('openrouter'),
+        },
+      },
     });
     const failedRunId = (
       await failing.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
@@ -416,7 +445,8 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
       overrides: {
         embedder: new MockEmbedder(),
         git: new MockGitClient({ diff: DIFF }),
-        llm: { openai: llm },
+        github: new MockGitHubClient(),
+        llm: { openai: llm, openrouter: new MockLLMProvider('openrouter') },
       },
     });
     const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
@@ -483,7 +513,10 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
         embedder: new MockEmbedder(),
         git: new MockGitClient({ diff: DIFF }),
         github: new MockGitHubClient(),
-        llm: { openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }) },
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }),
+          openrouter: new MockLLMProvider('openrouter'),
+        },
       },
     });
     const { repo, pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
@@ -565,6 +598,99 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     ).json();
     // seed has 2 enabled agents; we may have created more above in this PR's ws.
     expect(body.runs.length).toBeGreaterThanOrEqual(2);
+    await app.close();
+  });
+
+  it('derives PR intent as shared pre-work: pr_intent row, trace section, Live Log line, and caches on a same-head rerun', async () => {
+    const intentLlm = new MockLLMProvider('openrouter', { structuredBySchema: { PrIntent: INTENT_FIXTURE } });
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        github: new MockGitHubClient({
+          issues: {
+            471: {
+              number: 471,
+              title: 'Abuse from unauthenticated clients',
+              body: 'Public endpoints get hammered without limits.',
+              state: 'open',
+            },
+          },
+        }),
+        llm: { openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }), openrouter: intentLlm },
+      },
+    });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Intent Reviewer', provider: 'openai', model: 'gpt-4.1', system_prompt: 'review' },
+      })
+    ).json();
+
+    const first = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    const runId = first.json().runs[0].run_id as string;
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    const [intentRow] = await pg.handle.db.select().from(t.prIntent).where(eq(t.prIntent.prId, pr.id));
+    expect(intentRow?.intent).toBe(INTENT_FIXTURE.intent);
+
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+    expect(trace.prompt_assembly.intent).toContain(INTENT_FIXTURE.intent);
+    expect(trace.log.some((line: { msg: string }) => line.msg.includes('Deriving PR intent'))).toBe(true);
+    expect(intentLlm.calls.filter((c) => c.method === 'completeStructured')).toHaveLength(1);
+
+    // Same head SHA → the second run reuses the cached intent (no new PrIntent call).
+    await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 2 });
+    expect(intentLlm.calls.filter((c) => c.method === 'completeStructured')).toHaveLength(1);
+
+    await app.close();
+  });
+
+  it('reviews without intent when derivation fails, logging "intent: skipped"', async () => {
+    const app = await buildApp({
+      config: config(),
+      db: pg.handle.db,
+      overrides: {
+        embedder: new MockEmbedder(),
+        git: new MockGitClient({ diff: DIFF }),
+        github: new MockGitHubClient({
+          issues: { 471: { number: 471, title: 'Abuse', body: 'Hammered.', state: 'open' } },
+        }),
+        llm: {
+          openai: new MockLLMProvider('openai', { structured: REVIEW_FIXTURE }),
+          // Invalid PrIntent fixture — fails schema validation inside completeStructured.
+          openrouter: new MockLLMProvider('openrouter', { structuredBySchema: { PrIntent: {} } }),
+        },
+      },
+    });
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'Degraded Reviewer', provider: 'openai', model: 'gpt-4.1', system_prompt: 'review' },
+      })
+    ).json();
+
+    const queued = await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } });
+    const runId = queued.json().runs[0].run_id as string;
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+
+    const [run] = await pg.handle.db.select().from(t.agentRuns).where(eq(t.agentRuns.id, runId));
+    expect(run!.status).toBe('done');
+
+    const [intentRow] = await pg.handle.db.select().from(t.prIntent).where(eq(t.prIntent.prId, pr.id));
+    expect(intentRow).toBeUndefined();
+
+    const trace = (await app.inject({ method: 'GET', url: `/runs/${runId}/trace` })).json();
+    expect(trace.prompt_assembly.intent).toBeNull();
+    expect(trace.log.some((line: { msg: string }) => line.msg.includes('intent: skipped'))).toBe(true);
+
     await app.close();
   });
 });

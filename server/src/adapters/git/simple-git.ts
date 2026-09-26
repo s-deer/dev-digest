@@ -129,6 +129,33 @@ export class SimpleGitClient implements GitClient {
   async readFile(repo: RepoRef, path: string): Promise<string> {
     return readFile(join(this.clonePathFor(repo), path), 'utf8');
   }
+
+  async readFileAt(repo: RepoRef, ref: string, path: string): Promise<string> {
+    if (!HEX_SHA.test(ref)) {
+      throw new Error(`readFileAt: ref must be a full/short hex SHA, got "${ref}"`);
+    }
+    if (!isSafeRelativePath(path)) {
+      throw new Error(`readFileAt: unsafe path "${path}"`);
+    }
+    // `git show <ref>:<path>` reads a blob without touching the worktree or
+    // requiring HEAD to be at `ref`. argv is passed to simple-git's `raw()`
+    // without a shell, so there is no injection surface beyond the ref/path
+    // validation above.
+    return this.git(repo).raw(['show', `${ref}:${path}`]);
+  }
+}
+
+const HEX_SHA = /^[0-9a-f]{7,40}$/i;
+
+/** Re-check a repo-relative path right before it reaches argv: no traversal, no NUL/`:`, no absolute path. */
+function isSafeRelativePath(path: string): boolean {
+  return (
+    path.length > 0 &&
+    !path.startsWith('/') &&
+    !path.includes('..') &&
+    !path.includes(':') &&
+    !path.includes('\0')
+  );
 }
 
 function parseBlamePorcelain(raw: string): BlameLine[] {

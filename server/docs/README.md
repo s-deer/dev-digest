@@ -6,3 +6,4 @@ as `docs/<topic>.md`.
 
 - [run-lifecycle-and-cost.md](run-lifecycle-and-cost.md): a review run from `running` to `done`/`failed`/`cancelled`, cancellation, reaping orphaned runs on boot, and where `cost_usd` is stored and totalled.
 - [findings-read-model.md](findings-read-model.md): how severity counts and previews for the PR list and Timeline are computed on read, and what `null` means.
+- [intent-layer.md](intent-layer.md): how the Intent Layer (L03) derives why a PR exists, its cache key, confidence rules, API, and cost accounting.
