@@ -48,6 +48,7 @@
       "skillsTokens": "+{count} tokens",
       "skillsGroup": "Skills (dynamic) · {count, plural, one {# skill} other {# skills}} · +{tokens} tokens",
       "skillBlock": "Skill · {name} v{version} · +{tokens} tokens",
+      "intent": "PR intent — derived (untrusted, dynamic)",
       "memory": "Memory (dynamic)",
       "repoMap": "Repo skeleton — repo-intel (dynamic)",
       "specs": "Project context (dynamic)",

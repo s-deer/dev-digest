@@ -15,5 +15,17 @@
     "blame": "blame",
     "noHistory": "No history available for this line.",
     "noCommits": "No commits found for this line."
+  },
+  "intent": {
+    "briefLabel": "PR Brief",
+    "label": "Intent",
+    "inScope": "IN SCOPE",
+    "outOfScope": "OUT OF SCOPE",
+    "noneStated": "None stated",
+    "emptyTitle": "No brief yet",
+    "emptyBody": "Generate a Why+Risk brief for this PR.",
+    "generate": "Generate brief",
+    "loadError": "Couldn't load the PR intent.",
+    "generateError": "Couldn't generate the PR brief."
   }
 }

@@ -83,4 +83,17 @@ describe("A5 Run Trace drawer (smoke)", () => {
     expect(screen.getByText(/Running/)).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
   });
+
+  it("shows the derived PR intent prompt block when the trace has one", () => {
+    currentTrace = { ...TRACE, prompt_assembly: { ...TRACE.prompt_assembly, intent: "Confidence: high (0.85) — …" } };
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    fireEvent.click(screen.getByText("Prompt assembly"));
+    expect(screen.getByText("PR intent — derived (untrusted, dynamic)")).toBeInTheDocument();
+  });
+
+  it("hides the PR intent prompt block on a trace without one", () => {
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+    fireEvent.click(screen.getByText("Prompt assembly"));
+    expect(screen.queryByText("PR intent — derived (untrusted, dynamic)")).not.toBeInTheDocument();
+  });
 });

@@ -14,6 +14,7 @@ export type TraceTab = (typeof TABS)[number];
 export const PROMPT_COLORS = {
   system: "var(--text-muted)",
   skills: "var(--accent)",
+  intent: "var(--accent)",
   memory: "var(--warn)",
   repoMap: "var(--accent)",
   specs: "var(--text-secondary)",

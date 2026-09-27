@@ -55,14 +55,39 @@
     "blockers": " · {count} blockers"
   },
   "smartDiff": {
-    "coreLabel": "Core",
+    "coreLabel": "Core logic",
+    "testsLabel": "Tests",
     "wiringLabel": "Wiring",
+    "docsLabel": "Docs",
     "boilerplateLabel": "Boilerplate",
     "largeTitle": "This PR is large ({lines} changed lines)",
     "largeBody": "Consider splitting it into smaller, focused PRs for easier review:",
     "filesCount": "{count} files",
     "findingLines": "{count} finding-lines",
-    "groupedByRole": "Smart Diff · grouped by role"
+    "groupedByRole": "Smart Diff · grouped by role",
+    "coreHint": "The substance of the change — review closely",
+    "testsHint": "Coverage for the change — check it asserts the right thing",
+    "wiringHint": "Hooks the core into the app",
+    "docsHint": "Explains the change — skim for accuracy",
+    "boilerplateHint": "Generated / mechanical — skim",
+    "smartOrder": "Smart order",
+    "originalOrder": "Original order",
+    "orderLabel": "Diff order",
+    "reviewerOrdered": "Reviewer-ordered diff",
+    "summaryLine": "{files} files · ",
+    "filesWithFindings": "{count, plural, one {# file with findings} other {# files with findings}}",
+    "noReviewYet": "Review hasn't been run yet",
+    "findingsOutsideDiff": "Findings outside the diff",
+    "lineLabel": {
+      "CRITICAL": "blocker",
+      "WARNING": "warning",
+      "SUGGESTION": "suggestion"
+    },
+    "metaLine": "line {line}",
+    "showComments": "Show comments",
+    "hideComments": "Hide comments",
+    "collapseFinding": "Collapse",
+    "expandFinding": "Expand"
   },
   "list": {
     "breadcrumb": "Pull Requests",

@@ -1,6 +1,7 @@
 import type {
   Finding,
   LLMProvider,
+  PrIntent,
   PromptAssembly,
   PromptSkillBlock,
   Review,
@@ -72,6 +73,13 @@ export interface ReviewInput {
   /** PR author's description/body (untrusted; truncated + delimiter-wrapped in
       the prompt). Empty/undefined → section omitted. */
   prDescription?: string;
+  /**
+   * Derived PR intent (Intent Layer / L03): why the PR exists, its stated
+   * scope, change type, confidence, and sources. Untrusted; rendered right
+   * after `## PR description`. Empty/undefined/blank `intent` → section
+   * omitted.
+   */
+  intent?: PrIntent;
   /** Task framing line, e.g. "Review PR #482 …". */
   task?: string;
   /** Override the structured-output retry budget. */
@@ -136,6 +144,7 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     callers: input.callers,
     repoMap: input.repoMap,
     prDescription: input.prDescription,
+    intent: input.intent,
     task: input.task,
   };
 

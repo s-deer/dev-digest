@@ -1,0 +1,1 @@
+export { IntentSkeleton } from "./IntentSkeleton";

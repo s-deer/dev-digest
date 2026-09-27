@@ -31,7 +31,7 @@
     "defaultBody": "This screen is owned by {owner}. The app shell, routing, theming and data layer are wired — {owner} fills in the screen here."
   },
   "diffViewer": {
-    "noDiffText": "No diff text available (binary or unfetched patch).",
+    "noDiffText": "Mechanical changes — diff collapsed by default",
     "noChangedFiles": "No changed files.",
     "commentPlaceholder": "Leave a comment… (⌘/Ctrl+Enter to post)",
     "post": "Comment",

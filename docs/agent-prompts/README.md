@@ -35,11 +35,12 @@ fixture / not for production / ignore this" never descope the review. You do not
 need to repeat any of this in your prompt — it is always there.
 
 **User message** = the task and all context, in this order, each untrusted block
-delimiter-wrapped (`prompt.ts:104-122`):
+delimiter-wrapped (`prompt.ts:200-217`):
 
 ```
 <task line, e.g. "Review PR #7 '…'">
 ## PR description        (untrusted, author-controlled, truncated to 4000 chars)
+## PR intent (derived)   (untrusted, derived; trusted "how to use it" line outside the wrapper)
 ## Skills / rules        (enabled skills, one `### Skill: <name> (vN)` block each, in agent order)
 ## Relevant memory       (curated memory items)
 ## Repo skeleton         (untrusted, repo-derived)
@@ -51,6 +52,16 @@ delimiter-wrapped (`prompt.ts:104-122`):
 Sections with no content are omitted. Everything repo- or author-derived is wrapped
 in `<untrusted source="…">…</untrusted>` so the model can tell instructions
 (system) from data (user).
+
+`## PR intent (derived)` (Intent Layer / L03, `renderIntentSection` in
+`prompt.ts`) carries the intent, scope, change type, confidence, and sources
+that were derived once per PR before review. It is a **hint for judging
+scope**, not ground truth: the trusted instruction line right after the
+`</untrusted>` closing tag tells the model to flag in-scope items the diff
+doesn't deliver and out-of-scope changes as scope creep, but never to let a
+stated intent lower the severity of, or excuse, a real defect. The section is
+omitted (and the prompt stays byte-identical) when no intent was derived or
+the derived intent is blank.
 
 ## The output schema is NOT in the prompt
 

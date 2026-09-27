@@ -1,5 +1,13 @@
 import type { Container } from '../../platform/container.js';
-import type { PromptSkillBlock, Provider, Review, RunTrace, UnifiedDiff } from '@devdigest/shared';
+import type {
+  PrIntent,
+  PrIntentRecord,
+  PromptSkillBlock,
+  Provider,
+  Review,
+  RunTrace,
+  UnifiedDiff,
+} from '@devdigest/shared';
 import { reviewPullRequest, countBlockers, renderSkillBlock } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
@@ -35,6 +43,26 @@ export type RunOutcome = {
 };
 
 /**
+ * Narrow port for intent derivation (Intent Layer / L03) — declared locally
+ * (not `IntentService`'s own type) so this module doesn't depend on
+ * `modules/intent`; `Container['intentService']` satisfies it structurally.
+ */
+export interface IntentDeriver {
+  ensure(
+    workspaceId: string,
+    prId: string,
+    opts?: { diffPaths?: string[]; onEvent?: (message: string) => void },
+  ): Promise<{ record: PrIntentRecord; prBody: string | null; cached: boolean; sourcesSummary: string }>;
+}
+
+/** Strips the record-only fields (`pr_id`, `head_sha`, `stale`, `provider`, `model`, token/cost accounting, `updated_at`) down to the `PrIntent` shape reviewer-core expects. */
+function toPrIntent(record: PrIntentRecord): PrIntent {
+  const { intent, in_scope, out_of_scope, change_type, confidence, confidence_score, sources, missing_docs } =
+    record;
+  return { intent, in_scope, out_of_scope, change_type, confidence, confidence_score, sources, missing_docs };
+}
+
+/**
  * Owns the background execution of queued agent runs (extracted from
  * ReviewService; behaviour unchanged). Loads the diff + intent once, then
  * map-reduces each agent, streaming events over the runBus and persisting each
@@ -45,6 +73,7 @@ export class ReviewRunExecutor {
     private container: Container,
     private repo: ReviewRepository,
     private agents: Container['agentsRepo'],
+    private intent: IntentDeriver,
   ) {}
 
   /**
@@ -105,6 +134,59 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    // ---- Shared pre-work: derive PR intent (Intent Layer / L03) -----------
+    // One derivation per PR (cached by head_sha + inputs_hash), shared across
+    // every queued agent below — never per agent. A failure here degrades to
+    // reviewing without intent; it does not fail the queued runs.
+    let intent: PrIntent | null = null;
+    let prBody: string | null = pull.body ?? null;
+    try {
+      const { record, prBody: fetchedBody, cached, sourcesSummary } = await runLog.step(
+        'Deriving PR intent',
+        () =>
+          this.intent.ensure(workspaceId, pull.id, {
+            diffPaths: diff.files.map((f) => f.path),
+            onEvent: (message) => runLog.info(message),
+          }),
+        { kind: 'tool' },
+      );
+      prBody = fetchedBody;
+      intent = toPrIntent(record);
+
+      if (cached) {
+        runLog.info(`intent: cached for head ${record.head_sha.slice(0, 7)} (derived ${record.updated_at})`);
+      } else {
+        const costLabel = record.cost_usd == null ? 'unpriced' : `$${record.cost_usd.toFixed(4)}`;
+        runLog.info(
+          `intent: derived with ${record.provider}/${record.model} — ${record.tokens_in}→${record.tokens_out} tokens · ${costLabel} (billed once per PR, not per agent)`,
+        );
+      }
+      runLog.info(`intent: sources — ${sourcesSummary}`);
+      runLog.info(
+        `intent: confidence ${record.confidence} (${record.confidence_score.toFixed(2)}) · change_type ${record.change_type}` +
+          (record.missing_docs ? ' · missing docs — inferred from indirect signals' : ''),
+      );
+      logger?.info(
+        {
+          prId: pull.id,
+          headSha: record.head_sha,
+          cached,
+          confidence: record.confidence,
+          changeType: record.change_type,
+          missingDocs: record.missing_docs,
+          model: record.model,
+          tokensIn: record.tokens_in,
+          tokensOut: record.tokens_out,
+          costUsd: record.cost_usd,
+        },
+        'review: intent ready',
+      );
+    } catch (err) {
+      const msg = (err as Error).message;
+      runLog.info(`intent: skipped — ${msg}; reviewing without intent`);
+      logger?.warn({ prId: pull.id, err: msg }, 'review: intent skipped');
+    }
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -112,7 +194,7 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog, intent, prBody);
         logger?.info(
           {
             runId,
@@ -144,6 +226,8 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    intent: PrIntent | null,
+    prBody: string | null,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -224,8 +308,14 @@ export class ReviewRunExecutor {
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
-        // truncates it. Omitted when the PR has no body.
-        ...(pull.body ? { prDescription: pull.body } : {}),
+        // truncates it. Omitted when unavailable. `prBody` is the shared
+        // pre-work's result (persisted, or freshly fetched from GitHub when
+        // the PR row had none) — prefer it over the possibly-stale `pull.body`.
+        ...(prBody ? { prDescription: prBody } : {}),
+        // Derived PR intent (Intent Layer / L03) — shared pre-work, same
+        // instance for every agent in this batch. Omitted when derivation
+        // failed (executor already logged "intent: skipped" and continues).
+        ...(intent ? { intent } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -303,7 +393,11 @@ export class ReviewRunExecutor {
         })),
         raw_output: outcome.raw,
         memory_pulled: [],
-        specs_read: [],
+        // Plan/spec doc refs actually fetched into the intent derivation above
+        // (Intent Layer / L03); empty when intent was skipped or none matched.
+        specs_read: intent
+          ? intent.sources.filter((s) => (s.kind === 'plan' || s.kind === 'spec') && s.fetched).map((s) => s.ref)
+          : [],
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),

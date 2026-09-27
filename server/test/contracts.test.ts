@@ -15,6 +15,9 @@ import {
   Settings,
   Repo,
   PrDetail,
+  PrIntentRecord,
+  PromptAssembly,
+  GenerateIntentBody,
 } from '@devdigest/shared';
 
 /**
@@ -117,6 +120,23 @@ describe('AI contracts parse fixtures', () => {
     expect(d.groups[0]!.role).toBe('core');
   });
 
+  it('SmartDiff with tests and docs groups (5-role enum)', () => {
+    const d = SmartDiff.parse({
+      groups: [
+        {
+          role: 'tests',
+          files: [{ path: 'a.test.ts', additions: 10, deletions: 0, finding_lines: [] }],
+        },
+        {
+          role: 'docs',
+          files: [{ path: 'README.md', additions: 5, deletions: 1, finding_lines: [3] }],
+        },
+      ],
+      split_suggestion: { too_big: false, total_lines: 16, proposed_splits: [] },
+    });
+    expect(d.groups.map((g) => g.role)).toEqual(['tests', 'docs']);
+  });
+
   it('Conformance / Onboarding / EvalRun / MemoryItem', () => {
     expect(() =>
       Conformance.parse({
@@ -166,6 +186,45 @@ describe('AI contracts parse fixtures', () => {
       log: [{ t: '00.00', kind: 'info', msg: 'started' }],
     });
     expect(trace.tool_calls).toHaveLength(1);
+  });
+});
+
+describe('Intent Layer (L03) contracts', () => {
+  it('PrIntentRecord parses a full sample', () => {
+    const record = PrIntentRecord.parse({
+      intent: 'Add rate limiting to the public webhook endpoint.',
+      in_scope: ['Add a token-bucket limiter middleware'],
+      out_of_scope: ['Rewriting the webhook handler'],
+      change_type: 'feature',
+      confidence: 'high',
+      confidence_score: 0.85,
+      sources: [
+        { kind: 'issue', ref: '#471', fetched: true, note: null },
+        { kind: 'external_ref', ref: 'ABC-123', fetched: false, note: 'reference only — not fetched' },
+      ],
+      missing_docs: false,
+      pr_id: 'pr_1',
+      head_sha: 'a1b2c3d',
+      stale: false,
+      provider: 'openrouter',
+      model: 'deepseek/deepseek-v4-flash',
+      tokens_in: 1200,
+      tokens_out: 180,
+      cost_usd: 0.002,
+      cost_usd_total: 0.004,
+      updated_at: '2026-09-26T00:00:00.000Z',
+    });
+    expect(record.confidence).toBe('high');
+    expect(record.sources).toHaveLength(2);
+  });
+
+  it('PromptAssembly parses an old trace without intent', () => {
+    const assembly = PromptAssembly.parse({ system: 's', user: 'u' });
+    expect(assembly.intent).toBeUndefined();
+  });
+
+  it('GenerateIntentBody defaults force to false', () => {
+    expect(GenerateIntentBody.parse({})).toEqual({ force: false });
   });
 });
 

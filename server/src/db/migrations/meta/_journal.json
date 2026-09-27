@@ -134,6 +134,20 @@
       "when": 1789846481614,
       "tag": "0018_lucky_multiple_man",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790427149112,
+      "tag": "0019_brief_loa",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790431303537,
+      "tag": "0020_left_micromacro",
+      "breakpoints": true
     }
   ]
 }

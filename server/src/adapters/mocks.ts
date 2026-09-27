@@ -130,6 +130,13 @@ export interface MockGitHubOptions {
   login?: string;
   /** Existing inline review comments returned by listReviewComments. */
   comments?: PrReviewComment[];
+  /**
+   * Fixtures for `getIssue`, keyed by issue number. When set, a missing key
+   * throws (mirrors a 404) instead of falling back to the default mock issue.
+   */
+  issues?: Record<number, IssueMeta>;
+  /** Fixtures for `getFileContent`, keyed by path. A missing path returns null (mirrors a 404/dir/non-file). */
+  contents?: Record<string, string>;
 }
 
 export class MockGitHubClient implements GitHubClient {
@@ -137,6 +144,8 @@ export class MockGitHubClient implements GitHubClient {
   public openedPrs: OpenPrPayload[] = [];
   public committed: CommitFilesPayload[] = [];
   public createdComments: CreateReviewCommentInput[] = [];
+  public issueCalls: number[] = [];
+  public contentCalls: { path: string; ref: string }[] = [];
 
   constructor(private opts: MockGitHubOptions = {}) {}
 
@@ -236,7 +245,18 @@ export class MockGitHubClient implements GitHubClient {
   }
 
   async getIssue(_repo: RepoRef, n: number): Promise<IssueMeta> {
+    this.issueCalls.push(n);
+    if (this.opts.issues) {
+      const fixture = this.opts.issues[n];
+      if (!fixture) throw new Error(`MockGitHubClient.getIssue: no fixture for #${n}`);
+      return fixture;
+    }
     return { number: n, title: `Issue #${n}`, body: 'mock issue', state: 'open' };
+  }
+
+  async getFileContent(_repo: RepoRef, path: string, ref: string): Promise<string | null> {
+    this.contentCalls.push({ path, ref });
+    return this.opts.contents?.[path] ?? null;
   }
 
   async currentLogin(): Promise<string> {
@@ -254,6 +274,8 @@ export interface MockGitOptions {
   head?: string;
   /** Head `currentHead()` returns AFTER `sync()` runs — simulates fetch+reset advancing HEAD. */
   syncedHead?: string;
+  /** Fixtures for `readFileAt`, keyed `${ref}:${path}`. A missing key throws (mirrors `git show` on a missing blob). */
+  filesAt?: Record<string, string>;
 }
 
 export class MockGitClient implements GitClient {
@@ -297,6 +319,12 @@ export class MockGitClient implements GitClient {
   }
   async readFile(_repo: RepoRef, path: string): Promise<string> {
     return this.opts.files?.[path] ?? '';
+  }
+  async readFileAt(_repo: RepoRef, ref: string, path: string): Promise<string> {
+    const key = `${ref}:${path}`;
+    const content = this.opts.filesAt?.[key];
+    if (content == null) throw new Error(`MockGitClient.readFileAt: no fixture for "${key}"`);
+    return content;
   }
 }
 
