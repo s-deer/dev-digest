@@ -2,6 +2,8 @@
  * cost discipline — per-provider/model pricing table (USD per 1M tokens).
  * Unknown models return null cost (explicitly flagged), per spec.
  */
+import Decimal from 'decimal.js';
+
 interface Price {
   in: number;
   out: number;
@@ -37,5 +39,13 @@ const PRICING: Record<string, Price> = {
 export function estimateCost(model: string, tokensIn: number, tokensOut: number): number | null {
   const p = PRICING[model];
   if (!p) return null;
-  return (tokensIn * p.in + tokensOut * p.out) / 1_000_000;
+  const cost = new Decimal(tokensIn)
+    .times(p.in)
+    .plus(new Decimal(tokensOut).times(p.out))
+    .dividedBy(1_000_000);
+  return cost.toDecimalPlaces(6).toNumber();
+}
+
+export function hasPricing(model: string): boolean {
+  return model in PRICING;
 }
