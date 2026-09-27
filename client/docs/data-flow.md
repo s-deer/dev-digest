@@ -34,6 +34,7 @@ page.tsx / _components   →   src/lib/hooks/*.ts   →   src/lib/api.ts   →  
 | Trace drawer stats, prompt, log | `useRunTrace` (`hooks/trace.ts:12`) | `["run-trace", runId]` | `GET /runs/:id/trace` | — |
 | Trace drawer **findings** | *no fetch*: taken from `usePrReviews` data | — | — | — |
 | Overview **Intent** card | `usePrIntent` (`hooks/intent.ts:12`) | `["pr-intent", prId]` | `GET /pulls/:id/intent` | on invalidation |
+| Files changed → **Smart order** groups, counters, file dots | `useSmartDiff` (`hooks/smart-diff.ts:17`) | `["pr-smart-diff", prId]` | `GET /pulls/:id/smart-diff` | on invalidation; enabled only once `usePullDetail`'s files have loaded (see [`../../server/docs/smart-diff.md`](../../server/docs/smart-diff.md)) |
 
 The tab is in the URL: `?tab=findings` is the tab labelled **"Agent runs"**
 (`_components/PrDetailHeader/PrDetailHeader.tsx:117`). The open trace is
@@ -49,20 +50,22 @@ review) shows an empty findings section even though the trace exists.
 | Mutation | Invalidates |
 | --- | --- |
 | `useRunReview` (`reviews.ts:124`) | `["reviews", prId]`; the header's `onRunsStarted` also invalidates active runs |
-| run finished (`onRunDone` in `page.tsx`) | active runs, `["pr-runs"]`, refetch reviews, `["pr-intent", prId]` (`page.tsx:160`) |
+| run finished (`onRunDone` in `page.tsx`) | active runs, `["pr-runs"]`, refetch reviews, `["pr-intent", prId]`, `["pr-smart-diff", prId]` (`page.tsx:158-164`) |
 | `useDeleteRun` (`reviews.ts:60`) | `["pr-runs"]`, `["reviews"]` |
 | `useDeleteReview` (`reviews.ts:81`) | `["reviews"]` only |
-| `useFindingAction` accept/dismiss (`reviews.ts:139`) | `["reviews", prId]` **only** |
+| `useFindingAction` accept/dismiss (`reviews.ts:139`) | `["reviews", prId]` **and** `["pr-smart-diff", prId]` (`reviews.ts:158-164`) — accepting/dismissing changes a file's `finding_lines`, so the Smart Diff group counters and file dots must refresh too |
 | `useGenerateIntent` (`hooks/intent.ts:22-31`) | sets `["pr-intent", prId]` to the fresh record directly (`setQueryData`, no refetch), and invalidates `["pulls"]` so the PR list's COST column picks up the new `cost_usd_total` |
 
 ### Known staleness
 
-Dismissing a finding updates the Review runs card at once. The **Timeline
-severity badges** (`["pr-runs"]`) and the **PR list FINDINGS column**
-(`["pulls"]`) both exclude dismissed findings on the server, but they are not
-invalidated, so they show the old counts until the next poll (list: 60 s), a
-remount after `staleTime`, or a reload. If you need them in sync, add those
-keys to `useFindingAction.onSuccess`. Don't copy counts into local state.
+Dismissing a finding updates the Review runs card and the Smart Diff group
+counters/file dots at once (both are in `useFindingAction`'s invalidation
+list, above). The **Timeline severity badges** (`["pr-runs"]`) and the **PR
+list FINDINGS column** (`["pulls"]`) both exclude dismissed findings on the
+server, but they are not invalidated, so they show the old counts until the
+next poll (list: 60 s), a remount after `staleTime`, or a reload. If you need
+them in sync, add those keys to `useFindingAction.onSuccess`. Don't copy
+counts into local state.
 
 ## Testing implication
 

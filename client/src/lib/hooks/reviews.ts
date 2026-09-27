@@ -6,6 +6,7 @@ import React from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, API_BASE } from "../api";
 import { notify } from "../toast";
+import { smartDiffKey } from "./smart-diff";
 import type {
   FindingActionKind,
   PrReviewComment,
@@ -155,7 +156,12 @@ export function useFindingAction() {
         reply ? { reply } : undefined,
       ),
     onSuccess: (_d, { prId }) => {
-      if (prId) qc.invalidateQueries({ queryKey: ["reviews", prId] });
+      if (prId) {
+        qc.invalidateQueries({ queryKey: ["reviews", prId] });
+        // Accepting/dismissing changes finding_lines, so the Smart Diff dots
+        // and group counters must refresh too, without a reload.
+        qc.invalidateQueries({ queryKey: smartDiffKey(prId) });
+      }
     },
   });
 }

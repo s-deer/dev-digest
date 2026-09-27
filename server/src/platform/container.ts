@@ -29,6 +29,8 @@ import { RepoRepository } from '../modules/repos/repository.js';
 import { SkillsRepository } from '../modules/skills/repository.js';
 import { IntentRepository } from '../modules/intent/repository.js';
 import { IntentService } from '../modules/intent/service.js';
+import { SmartDiffRepository } from '../modules/smart-diff/repository.js';
+import { SmartDiffService } from '../modules/smart-diff/service.js';
 import { resolveFeatureModel } from '../modules/settings/feature-models.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
@@ -81,6 +83,8 @@ export class Container {
   private _reviewRepo?: ReviewRepository;
   private _intentRepo?: IntentRepository;
   private _intentService?: IntentService;
+  private _smartDiffRepo?: SmartDiffRepository;
+  private _smartDiffService?: SmartDiffService;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -130,6 +134,15 @@ export class Container {
       resolveModel: (workspaceId) => resolveFeatureModel(this, workspaceId, 'review_intent'),
       llm: (provider) => this.llm(provider),
     }));
+  }
+
+  get smartDiffRepo(): SmartDiffRepository {
+    return (this._smartDiffRepo ??= new SmartDiffRepository(this.db));
+  }
+
+  /** SmartDiffService (L03) — narrow deps, no `Container` (see onion-architecture). */
+  get smartDiffService(): SmartDiffService {
+    return (this._smartDiffService ??= new SmartDiffService({ source: this.smartDiffRepo }));
   }
 
   get codeIndex(): CodeIndex {

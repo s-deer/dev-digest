@@ -120,6 +120,23 @@ describe('AI contracts parse fixtures', () => {
     expect(d.groups[0]!.role).toBe('core');
   });
 
+  it('SmartDiff with tests and docs groups (5-role enum)', () => {
+    const d = SmartDiff.parse({
+      groups: [
+        {
+          role: 'tests',
+          files: [{ path: 'a.test.ts', additions: 10, deletions: 0, finding_lines: [] }],
+        },
+        {
+          role: 'docs',
+          files: [{ path: 'README.md', additions: 5, deletions: 1, finding_lines: [3] }],
+        },
+      ],
+      split_suggestion: { too_big: false, total_lines: 16, proposed_splits: [] },
+    });
+    expect(d.groups.map((g) => g.role)).toEqual(['tests', 'docs']);
+  });
+
   it('Conformance / Onboarding / EvalRun / MemoryItem', () => {
     expect(() =>
       Conformance.parse({

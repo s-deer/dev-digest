@@ -75,10 +75,39 @@ export function chevronFor(open: boolean): CSSProperties {
   };
 }
 
-/** Row background per line kind (add/del tinted, others transparent). */
-export function lineRowFor(kind: Line["kind"]): CSSProperties {
+/** Row background per line kind (add/del tinted, others transparent), plus an
+   optional left stripe for the line's top finding severity. */
+export function lineRowFor(kind: Line["kind"], sevColor?: string): CSSProperties {
   const background = kind === "add" ? "var(--code-add)" : kind === "del" ? "var(--code-del)" : "transparent";
-  return { display: "flex", alignItems: "stretch", fontSize: 13, lineHeight: "20px", background };
+  return {
+    display: "flex",
+    alignItems: "stretch",
+    fontSize: 13,
+    lineHeight: "20px",
+    background,
+    borderLeftWidth: 3,
+    borderLeftStyle: "solid",
+    borderLeftColor: sevColor ?? "transparent",
+  };
+}
+
+/** Right-side severity label for a line's top finding (e.g. "blocker"). */
+export function sevLabelFor(color: string): CSSProperties {
+  return {
+    fontSize: 11,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
+    color,
+    flexShrink: 0,
+    alignSelf: "center",
+    paddingRight: 12,
+  };
+}
+
+/** The findings dot next to a file's path — colour follows its top severity. */
+export function findingsDotFor(color: string): CSSProperties {
+  return { width: 7, height: 7, borderRadius: "50%", background: color, flexShrink: 0 };
 }
 
 /** Gutter sign colour per line kind. */

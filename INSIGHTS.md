@@ -34,3 +34,21 @@ changes; only record what would otherwise get re-discovered the hard way.
 - **Insight:** The gate regex-matches the raw command string, not the parsed argv. So `echo`, heredocs, test fixtures or `grep` patterns that contain those words are blocked with "no self-review verdict" even though nothing gets pushed.
 - **Do:** When a command only needs to *mention* these words (tests, fixtures), build the string at runtime (`"git "+"push"`) or keep it in a file. NEVER edit the matcher or the settings to get past the gate; run /pr-self-review instead.
 - **Evidence:** `GATED` regex in `.claude/skills/pr-self-review/scripts/gate.mjs`; reproduced by piping a hook JSON that contains `gh pr create` through `echo`.
+
+### 2026-09-26 · `verdict.mjs` needs the same `--base` as `prepare.mjs`, or it reports a phantom "files changed"
+- **Context:** `/pr-self-review` on uncommitted work, run as `prepare.mjs --base HEAD` because `origin/main` was reset to the starter state and its merge-base drags in hundreds of unrelated commits.
+- **Insight:** Before the first verdict exists, `verdict.mjs triage|write` recompute the fingerprint against the default base (`origin/main`) unless given `--base`. They then fail with `No prepare.json for the current diff (fingerprint …). The files changed since the last run`, even though no file changed.
+- **Do:** ALWAYS pass the identical `--base <ref>` to `prepare.mjs`, `verdict.mjs triage` and `verdict.mjs write`. NEVER "fix" the message by rerunning prepare (see next entry).
+- **Evidence:** `.claude/skills/pr-self-review/scripts/verdict.mjs:119` (`collectDiff(args.base ?? latest?.baseRef)`); fingerprint `3b807c1a…` without `--base` vs `11560683…` with `--base HEAD`, same tree.
+
+### 2026-09-26 · Rerunning `prepare.mjs` deletes the reviewers' findings even when the fingerprint is unchanged
+- **Context:** `/pr-self-review` between stage 2 (per-skill subagents write `work/<fingerprint>/llm/<skill>.json`) and `verdict.mjs write`.
+- **Insight:** `prepare.mjs` always wipes `work/<fingerprint>/` before recreating it, so a rerun on identical content silently discards every `llm/*.json`; `write` then sees no findings for those skills.
+- **Do:** NEVER rerun `prepare.mjs` after launching the skill reviewers unless files really changed; if it happened, rerun the affected reviewers — do not reconstruct their JSON by hand.
+- **Evidence:** `.claude/skills/pr-self-review/scripts/prepare.mjs:18` (`rmSync(workDir, { recursive: true, force: true })`).
+
+### 2026-09-26 · plan-verifier cannot run `pnpm build`, so a plan's build step comes back UNVERIFIABLE unless the implementer reports it
+- **Context:** Plans whose Verify or Verification lines include `cd client && pnpm build`, run through the pipeline implementer → plan-verifier (`.claude/agents/`).
+- **Insight:** `pnpm build` is outside the plan-verifier's allowed command set. It marks that item UNVERIFIABLE (or E2E PARTIAL), even though typecheck and tests pass.
+- **Do:** ALWAYS have the implementer run `pnpm build` and quote the result in its report. Tell plan-verifier the build result was reported by the implementer, so the gap isn't misread as a failure.
+- **Evidence:** Smart Diff plan verification (`docs/plans/smart-diff-plan.md`, S10.verify / E2E[2]).

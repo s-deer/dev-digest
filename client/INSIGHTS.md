@@ -48,3 +48,9 @@ re-discovered the hard way.
 - **Insight:** `usePrIntent`'s `useQuery` uses `enabled: !!prId`. With `enabled:false`, TanStack Query v5 never fetches, so `isPending` stays `true` indefinitely — but `isLoading` (`isPending && isFetching`) correctly stays `false`. Gating the skeleton on `isLoading || isPending` therefore never leaves the loading state once `prId` becomes available with no data yet, and shows it forever while `prId` is `null`.
 - **Do:** For a query disabled on a nullable key, branch on `!key || isLoading` and drop `isPending` from the loading condition entirely.
 - **Evidence:** `client/src/app/repos/[repoId]/pulls/[number]/_components/IntentCard/IntentCard.tsx`, `client/src/lib/hooks/intent.ts`.
+
+### 2026-09-26 · `next-intl` logs `MISSING_MESSAGE` instead of throwing, so a missing namespace doesn't fail a test
+- **Context:** adding a `useTranslations("prReview")` call to `CodeLine`/`FileCard` (shared `components/diff-viewer/**`) for Smart Diff's inline finding labels.
+- **Insight:** `src/test/smoke.test.tsx` renders `DiffViewer` with only `{ shell: shellMessages }` in `NextIntlClientProvider`. Adding a second namespace to a component it renders doesn't fail that test — `next-intl` prints `IntlError: MISSING_MESSAGE` to stderr and renders the raw key/fallback, so the suite stays green while quietly breaking the missing namespace's UI.
+- **Do:** When a widely-rendered shared component (`components/**`, not a single feature) gains a new `useTranslations` namespace, grep for every other test/fixture that renders it (not just its own `*.test.tsx`) and add the namespace there too — a passing run doesn't prove the message resolved.
+- **Evidence:** `client/src/test/smoke.test.tsx`, `client/src/components/diff-viewer/CodeLine/CodeLine.tsx`.

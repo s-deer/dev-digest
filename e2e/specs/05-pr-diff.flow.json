@@ -1,6 +1,6 @@
 {
   "name": "PR detail Files changed tab renders the seeded diff",
-  "description": "From PR #482, open the Files changed tab and confirm the unified-diff viewer renders a seeded file path (src/config.ts). Exercises the refactored diff-viewer (DiffViewer → FileCard → CodeLine). Read-only seeded data (no model call). Assumes a freshly-seeded DB (see e2e/README.md).",
+  "description": "From PR #482, open the Files changed tab and confirm the unified-diff viewer renders a seeded file path (src/config.ts), that the Smart Diff grouping (Smart order / Original order toggle, role group headers like Core) renders, and that toggling to Original order keeps the seeded file visible. Exercises the refactored diff-viewer (DiffViewer → FileCard → CodeLine) plus the Smart Diff toolbar and groups. Read-only seeded data (no model call, no write actions). Assumes a freshly-seeded DB (see e2e/README.md).",
   "steps": [
     { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
     { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
@@ -9,6 +9,11 @@
     { "cmd": ["wait", "--load", "networkidle"], "label": "PR detail data settles" },
     { "cmd": ["find", "role", "button", "click", "--name", "Files changed"], "label": "switch to the Files changed tab" },
     { "cmd": ["wait", "--url", "tab=diff"], "label": "diff tab is active in the URL" },
-    { "cmd": ["wait", "--text", "src/config.ts"], "label": "a seeded changed file renders in the diff viewer" }
+    { "cmd": ["wait", "--text", "src/config.ts"], "label": "a seeded changed file renders in the diff viewer" },
+    { "cmd": ["wait", "--text", "Smart order"], "label": "the Smart order / Original order toggle renders" },
+    { "cmd": ["wait", "--text", "Core"], "label": "the Core role group header renders (Smart Diff default order)" },
+    { "cmd": ["wait", "--text", "src/config.ts"], "label": "the seeded file is still visible grouped by role" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Original order"], "label": "switch to Original order (read-only UI toggle)" },
+    { "cmd": ["wait", "--text", "src/config.ts"], "label": "the seeded file is still visible in Original order" }
   ]
 }

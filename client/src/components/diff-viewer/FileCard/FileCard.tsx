@@ -4,7 +4,8 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon } from "@devdigest/ui";
+import { Icon, SEV } from "@devdigest/ui";
+import type { FindingRecord } from "@devdigest/shared";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
 import { parsePatch, type Line } from "../helpers";
@@ -15,9 +16,11 @@ import {
   type CommentThread,
   type DiffCommentApi,
 } from "../comments";
-import { s, chevronFor } from "../styles";
+import { partitionFindings, topSeverity, findingsForLine, type DiffFindingsApi } from "../findings";
+import { s, chevronFor, findingsDotFor } from "../styles";
 import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
+import { OutsideFindings } from "../OutsideFindings";
 
 /** Threads anchored to a given parsed line (RIGHT=new, LEFT=old). */
 function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): CommentThread[] {
@@ -30,8 +33,17 @@ function threadsForLine(ln: Line, matched: Map<string, CommentThread[]>): Commen
   return out;
 }
 
-export function FileCard({ file, commenting }: { file: PrFile; commenting?: DiffCommentApi }) {
+export function FileCard({
+  file,
+  commenting,
+  findings,
+}: {
+  file: PrFile;
+  commenting?: DiffCommentApi;
+  findings?: DiffFindingsApi;
+}) {
   const t = useTranslations("shell");
+  const tReview = useTranslations("prReview");
   const [open, setOpen] = React.useState(
     (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
   );
@@ -52,6 +64,17 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
     ? commenting.comments.filter((c) => c.path === file.path).length
     : 0;
 
+  // This file's kept findings from the latest review, split into ones a
+  // rendered line can anchor vs. ones the diff doesn't show (end-of-file block).
+  const fileFindings = findings?.byPath.get(file.path) ?? [];
+  const { outside } = React.useMemo(() => {
+    if (fileFindings.length === 0) return { matched: [] as FindingRecord[], outside: [] as FindingRecord[] };
+    const renderedKeys = new Set<string>();
+    for (const ln of lines) for (const k of keysForLine(ln)) renderedKeys.add(k);
+    return partitionFindings(fileFindings, renderedKeys);
+  }, [fileFindings, lines]);
+  const dotSeverity = topSeverity(fileFindings);
+
   return (
     <div style={s.fileCard}>
       <div onClick={() => setOpen((o) => !o)} style={s.fileHeader}>
@@ -60,6 +83,13 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
         <span className="mono" style={s.filePath}>
           {file.path}
         </span>
+        {dotSeverity && (
+          <span
+            aria-label={tReview("runStatus.findings", { count: fileFindings.length })}
+            title={tReview("runStatus.findings", { count: fileFindings.length })}
+            style={findingsDotFor(SEV[dotSeverity].c)}
+          />
+        )}
         <span className="mono tnum" style={s.fileStat}>
           <span style={s.addText}>+{file.additions}</span>{" "}
           <span style={s.delText}>−{file.deletions}</span>
@@ -85,10 +115,15 @@ export function FileCard({ file, commenting }: { file: PrFile; commenting?: Diff
                 path={file.path}
                 threads={threadsForLine(ln, matched)}
                 commenting={commenting}
+                lineFindings={fileFindings.length > 0 ? findingsForLine(ln, fileFindings) : []}
+                findings={findings}
               />
             ))
           )}
           {commenting && commenting.showComments && <OutdatedComments threads={outdated} />}
+          {findings && findings.show && (
+            <OutsideFindings findings={outside} onAction={findings.onAction} pending={findings.pending} />
+          )}
         </div>
       )}
     </div>
