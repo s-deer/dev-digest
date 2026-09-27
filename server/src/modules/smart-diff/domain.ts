@@ -57,3 +57,18 @@ export function buildSmartDiff(files: SmartDiffInputFile[], findings: SmartDiffI
     split_suggestion: { too_big: false, total_lines: totalLines, proposed_splits: [] },
   };
 }
+
+/** Counts for the route's `smart-diff: built` log line — pure so it has a
+ *  hermetic test instead of only being exercised through the route. */
+export function summarizeSmartDiff(smartDiff: SmartDiff): {
+  files: number;
+  groups: number;
+  findingFiles: number;
+} {
+  const files = smartDiff.groups.reduce((sum, group) => sum + group.files.length, 0);
+  const findingFiles = smartDiff.groups.reduce(
+    (sum, group) => sum + group.files.filter((file) => file.finding_lines.length > 0).length,
+    0,
+  );
+  return { files, groups: smartDiff.groups.length, findingFiles };
+}

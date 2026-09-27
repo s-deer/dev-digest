@@ -3,12 +3,13 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { SectionLabel, Button } from "@devdigest/ui";
-import { DiffViewer, type DiffCommentApi, type DiffFindingsApi } from "@/components/diff-viewer";
-import { usePrComments, useCreatePrComment, usePrReviews, useFindingAction } from "@/lib/hooks/reviews";
+import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
+import { usePrComments, useCreatePrComment } from "@/lib/hooks/reviews";
 import { useSmartDiff } from "@/lib/hooks/smart-diff";
 import { notify } from "@/lib/toast";
 import type { PrFile } from "@devdigest/shared";
-import { latestReviewFindings, findingsByPath, hasReview } from "./helpers";
+import { diffTotals } from "./helpers";
+import { useDiffFindings } from "./useDiffFindings";
 import { OrderToggle, type DiffOrder } from "./_components/OrderToggle";
 import { SmartDiffGroups } from "./_components/SmartDiffGroups";
 import { s } from "./styles";
@@ -25,12 +26,11 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
   const t = useTranslations("prReview");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
-  const { data: reviews } = usePrReviews(prId);
-  const findingAction = useFindingAction();
   // One toggle covers both GitHub comments and findings, and defaults to
   // shown — a review's findings should be visible under their line right away.
   const [show, setShow] = React.useState(true);
   const [order, setOrder] = React.useState<DiffOrder>("smart");
+  const { findingsApi, reviewed, findingsCount } = useDiffFindings(prId, show);
 
   // Smart Diff turns on only once the PR's files have loaded — before that,
   // the route has nothing to group. A disabled query stays `isPending`
@@ -41,18 +41,8 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
   const showSmart = order === "smart" && filesLoaded && !smartLoading && !smartError && !!smartDiff;
 
   const commentCount = comments?.length ?? 0;
-  const findings = React.useMemo(() => latestReviewFindings(reviews ?? []), [reviews]);
-  const byPath = React.useMemo(() => findingsByPath(findings), [findings]);
-  const toggleCount = commentCount + findings.length;
-  const reviewed = hasReview(reviews ?? []);
-  const totals = React.useMemo(
-    () =>
-      files.reduce(
-        (acc, f) => ({ add: acc.add + (f.additions ?? 0), del: acc.del + (f.deletions ?? 0) }),
-        { add: 0, del: 0 },
-      ),
-    [files],
-  );
+  const toggleCount = commentCount + findingsCount;
+  const totals = React.useMemo(() => diffTotals(files), [files]);
 
   const commenting: DiffCommentApi = {
     comments: comments ?? [],
@@ -68,15 +58,6 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
         notify.error(err instanceof Error ? err.message : "Couldn't post the comment to GitHub.");
         throw err;
       }
-    },
-  };
-
-  const findingsApi: DiffFindingsApi = {
-    byPath,
-    show,
-    pending: findingAction.isPending,
-    onAction: (findingId, action) => {
-      findingAction.mutate({ findingId, action, prId: prId ?? undefined });
     },
   };
 
@@ -101,8 +82,14 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
       </SectionLabel>
       <div style={s.toolbar}>
         <div style={s.toolbarLeft}>
-          <span className="mono tnum" style={s.summary}>
-            {t("smartDiff.summaryLine", { files: filesCount, add: totals.add, del: totals.del })}
+          <span style={s.summary}>
+            {t("smartDiff.summaryLine", { files: filesCount })}
+            <span className="mono tnum" style={s.summaryAdd}>
+              +{totals.add}
+            </span>{" "}
+            <span className="mono tnum" style={s.summaryDel}>
+              −{totals.del}
+            </span>
           </span>
           {!reviewed && <span style={s.noReview}>{t("smartDiff.noReviewYet")}</span>}
         </div>

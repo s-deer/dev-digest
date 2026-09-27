@@ -4,12 +4,12 @@
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { SEV } from "@devdigest/ui";
+import { Icon, SEV } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
 import { topSeverity, type DiffFindingsApi } from "../findings";
 import { type Line } from "../helpers";
-import { s, lineRowFor, lineSignFor, sevLabelFor } from "../styles";
+import { s, lineRowFor, lineSignFor, sevLabelFor, sevStripeFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 import { FindingComment } from "../FindingComment";
@@ -46,6 +46,7 @@ export function CodeLine({
   const showAdd = hover && !!target && !composing;
   const topSev = topSeverity(lineFindings);
   const sevColor = topSev ? SEV[topSev].c : undefined;
+  const SevIcon = topSev ? Icon[SEV[topSev].icon] : null;
 
   return (
     <div
@@ -53,7 +54,8 @@ export function CodeLine({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind, sevColor)}>
+      <div style={lineRowFor(ln.kind)}>
+        {topSev && sevColor && <span aria-hidden="true" style={sevStripeFor(sevColor)} />}
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button
@@ -74,8 +76,9 @@ export function CodeLine({
         <span className="mono" style={s.lineText}>
           {ln.text || " "}
         </span>
-        {topSev && sevColor && (
-          <span className="mono" style={sevLabelFor(sevColor)}>
+        {topSev && sevColor && SevIcon && (
+          <span style={sevLabelFor(sevColor)}>
+            <SevIcon size={11} aria-hidden="true" />
             {t(`smartDiff.lineLabel.${topSev}`)}
           </span>
         )}

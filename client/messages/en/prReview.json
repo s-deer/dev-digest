@@ -55,7 +55,7 @@
     "blockers": " · {count} blockers"
   },
   "smartDiff": {
-    "coreLabel": "Core",
+    "coreLabel": "Core logic",
     "testsLabel": "Tests",
     "wiringLabel": "Wiring",
     "docsLabel": "Docs",
@@ -72,8 +72,9 @@
     "boilerplateHint": "Generated / mechanical — skim",
     "smartOrder": "Smart order",
     "originalOrder": "Original order",
-    "reviewerOrdered": "Reviewer-ordered",
-    "summaryLine": "{files} files · +{add} −{del}",
+    "orderLabel": "Diff order",
+    "reviewerOrdered": "Reviewer-ordered diff",
+    "summaryLine": "{files} files · ",
     "filesWithFindings": "{count, plural, one {# file with findings} other {# files with findings}}",
     "noReviewYet": "Review hasn't been run yet",
     "findingsOutsideDiff": "Findings outside the diff",
@@ -82,6 +83,7 @@
       "WARNING": "warning",
       "SUGGESTION": "suggestion"
     },
+    "metaLine": "line {line}",
     "showComments": "Show comments",
     "hideComments": "Hide comments",
     "collapseFinding": "Collapse",

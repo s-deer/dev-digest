@@ -42,15 +42,17 @@ describe("FindingComment", () => {
     expect(screen.getByText("Hardcoded Stripe secret key")).toBeInTheDocument();
     expect(screen.getByText(/Stripe key is committed in source/)).toBeInTheDocument();
 
-    // Collapse (P3): the header click hides the rationale/suggestion body.
+    // Collapse (P3) via the top-right × — a real button with aria-expanded,
+    // not an aria-label that hides the finding's title/severity.
     fireEvent.click(screen.getByRole("button", { name: /collapse/i }));
     expect(screen.queryByText(/Stripe key is committed in source/)).not.toBeInTheDocument();
 
-    // Expand again, then fire both actions.
-    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
-    fireEvent.click(screen.getByText("Accept"));
+    // Expand again by clicking the (now one-line) header — its accessible
+    // name is the finding's own content (severity + title), not "Expand".
+    fireEvent.click(screen.getByRole("button", { name: /Hardcoded Stripe secret key/i }));
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expect(onAction).toHaveBeenCalledWith("accept");
-    fireEvent.click(screen.getByText("Dismiss"));
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(onAction).toHaveBeenCalledWith("dismiss");
   });
 });

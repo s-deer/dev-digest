@@ -1,6 +1,7 @@
 /* Pure helpers for DiffTab: pick the findings the diff should show inline
-   (the latest review's, dismissed ones dropped), and group them by file. */
-import type { ReviewRecord, FindingRecord } from "@devdigest/shared";
+   (the latest review's, dismissed ones dropped), group them by file, and sum
+   the toolbar's +/- totals. */
+import type { ReviewRecord, FindingRecord, PrFile } from "@devdigest/shared";
 
 /**
  * The newest `kind === 'review'` review's kept findings (dismissed ones
@@ -41,4 +42,12 @@ export function findingsByPath(findings: FindingRecord[]): Map<string, FindingRe
    found nothing" instead of just showing zero counters either way. */
 export function hasReview(reviews: ReviewRecord[]): boolean {
   return reviews.some((r) => r.kind === "review");
+}
+
+/** Sum of every file's additions/deletions, for the toolbar's "+N −N". */
+export function diffTotals(files: PrFile[]): { add: number; del: number } {
+  return files.reduce(
+    (acc, f) => ({ add: acc.add + (f.additions ?? 0), del: acc.del + (f.deletions ?? 0) }),
+    { add: 0, del: 0 },
+  );
 }

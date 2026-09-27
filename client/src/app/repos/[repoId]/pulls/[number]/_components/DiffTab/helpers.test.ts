@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import type { ReviewRecord, FindingRecord } from "@devdigest/shared";
-import { latestReviewFindings, findingsByPath, hasReview } from "./helpers";
+import type { ReviewRecord, FindingRecord, PrFile } from "@devdigest/shared";
+import { latestReviewFindings, findingsByPath, hasReview, diffTotals } from "./helpers";
 
 function finding(o: Partial<FindingRecord>): FindingRecord {
   return {
@@ -119,5 +119,21 @@ describe("hasReview", () => {
   it("is false with no reviews, or only non-review kinds", () => {
     expect(hasReview([])).toBe(false);
     expect(hasReview([review({ kind: "summary" })])).toBe(false);
+  });
+});
+
+describe("diffTotals", () => {
+  function file(o: Partial<PrFile>): PrFile {
+    return { path: "a.ts", additions: 0, deletions: 0, patch: null, ...o };
+  }
+
+  it("sums additions and deletions across files, treating missing values as 0", () => {
+    const files = [file({ additions: 3, deletions: 1 }), file({ additions: 2 }), file({})];
+
+    expect(diffTotals(files)).toEqual({ add: 5, del: 1 });
+  });
+
+  it("returns zeros for an empty file list", () => {
+    expect(diffTotals([])).toEqual({ add: 0, del: 0 });
   });
 });

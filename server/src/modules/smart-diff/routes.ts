@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { SmartDiffResponse } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
+import { summarizeSmartDiff } from './domain.js';
 
 /**
  * Smart Diff (L03) module.
@@ -19,15 +20,8 @@ export default async function smartDiffRoutes(appBase: FastifyInstance) {
     async (req) => {
       const { workspaceId } = await getContext(container, req);
       const smartDiff = await container.smartDiffService.build(workspaceId, req.params.id);
-      const files = smartDiff.groups.reduce((sum, group) => sum + group.files.length, 0);
-      const findingFiles = smartDiff.groups.reduce(
-        (sum, group) => sum + group.files.filter((file) => file.finding_lines.length > 0).length,
-        0,
-      );
-      req.log.info(
-        { prId: req.params.id, files, groups: smartDiff.groups.length, findingFiles, llm: false },
-        'smart-diff: built',
-      );
+      const { files, groups, findingFiles } = summarizeSmartDiff(smartDiff);
+      req.log.info({ prId: req.params.id, files, groups, findingFiles, llm: false }, 'smart-diff: built');
       return smartDiff;
     },
   );

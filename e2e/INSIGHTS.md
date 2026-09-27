@@ -10,3 +10,9 @@ re-discovered the hard way.
 - **Insight:** The vendored `NavItem` puts the visible label inside a nested `div` within the link, and `agent-browser find role link --name Conventions` did not resolve it even though the link was visible.
 - **Do:** Use the deterministic `find text Conventions click` locator for these sidebar items unless the nav primitive exposes an accessible link name.
 - **Evidence:** `client/src/vendor/ui/shell/NavItem.tsx`, `e2e/specs/10-conventions.flow.json`.
+
+### 2026-09-27 · `agent-browser wait --text` matches a substring, not the exact string
+- **Context:** renamed the Smart Diff `smartDiff.coreLabel` string from `"Core"` to `"Core logic"`; `specs/05-pr-diff.flow.json` step `wait --text "Core"` waits for the group header.
+- **Insight:** Ran `./scripts/e2e.sh` after the rename with the flow file untouched — flow 05 still passed. `wait --text` treats its argument as "page contains this text somewhere," so a label that grows (old text stays a prefix/substring of the new one) doesn't need the flow updated.
+- **Do:** Before editing a flow for a renamed label, check whether the old wait string is still a substring of the new one — it usually still passes unedited. Only edit the flow when the old text is no longer contained in the new one.
+- **Evidence:** `e2e/specs/05-pr-diff.flow.json` (`wait --text "Core"`), `client/messages/en/prReview.json` (`smartDiff.coreLabel`).

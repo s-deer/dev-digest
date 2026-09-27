@@ -46,6 +46,7 @@ export function GroupHeader({
       <span style={s.right}>
         {filesWithFindingsCount > 0 && (
           <span
+            className="tnum"
             style={s.countWrap}
             aria-label={t("smartDiff.filesWithFindings", { count: filesWithFindingsCount })}
           >
@@ -53,7 +54,9 @@ export function GroupHeader({
             {filesWithFindingsCount}
           </span>
         )}
-        <span style={s.filesCount}>{t("smartDiff.filesCount", { count: filesCount })}</span>
+        <span className="tnum" style={s.filesCount}>
+          {t("smartDiff.filesCount", { count: filesCount })}
+        </span>
       </span>
     </div>
   );

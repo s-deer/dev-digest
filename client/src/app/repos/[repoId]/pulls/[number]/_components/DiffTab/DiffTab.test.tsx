@@ -119,7 +119,7 @@ describe("DiffTab", () => {
     expect(screen.getByText("Hardcoded secret")).toBeInTheDocument();
     expect(screen.getByLabelText(/finding\(s\)/i)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Accept"));
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expect(mutateMock).toHaveBeenCalledWith({ findingId: "f1", action: "accept", prId: "p1" });
   });
 
@@ -138,7 +138,7 @@ describe("DiffTab", () => {
     useSmartDiffMock.mockReturnValue({ data: undefined, isLoading: true, isError: false });
     renderTab();
 
-    expect(screen.queryByText("Core")).not.toBeInTheDocument();
+    expect(screen.queryByText("Core logic")).not.toBeInTheDocument();
     expect(screen.getByText(FILE.path)).toBeInTheDocument();
   });
 
@@ -146,15 +146,15 @@ describe("DiffTab", () => {
     useSmartDiffMock.mockReturnValue({ data: SMART_DIFF, isLoading: false, isError: false });
     renderTab();
 
-    expect(screen.getByText("Core")).toBeInTheDocument();
+    expect(screen.getByText("Core logic")).toBeInTheDocument();
     expect(screen.getByText(FILE.path)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /original order/i }));
-    expect(screen.queryByText("Core")).not.toBeInTheDocument();
+    expect(screen.queryByText("Core logic")).not.toBeInTheDocument();
     expect(screen.getByText(FILE.path)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /smart order/i }));
-    expect(screen.getByText("Core")).toBeInTheDocument();
+    expect(screen.getByText("Core logic")).toBeInTheDocument();
   });
 
   it("shows the 'no review yet' hint instead of counters when no review has run", () => {

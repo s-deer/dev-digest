@@ -3,18 +3,37 @@ import type { CSSProperties } from "react";
 /** Co-located styles for FindingComment — a simpler FindingCard for inline
    use in the diff. */
 export const s = {
-  card: (muted: boolean): CSSProperties => ({
+  card: (muted: boolean, sevColor: string): CSSProperties => ({
     borderRadius: 6,
-    border: "1px solid var(--border)",
+    borderStyle: "solid",
+    borderWidth: 1,
+    borderColor: "var(--border)",
+    borderLeftWidth: 3,
+    borderLeftColor: sevColor,
     background: "var(--bg-elevated)",
     overflow: "hidden",
     opacity: muted ? 0.6 : 1,
   }),
-  header: {
+  headerWrap: { position: "relative" } satisfies CSSProperties,
+  headerBtn: {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    padding: "8px 10px",
+    width: "100%",
+    padding: "8px 32px 8px 10px",
+    cursor: "pointer",
+    textAlign: "left",
+  } satisfies CSSProperties,
+  closeBtn: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 20,
+    height: 20,
+    color: "var(--text-muted)",
     cursor: "pointer",
   } satisfies CSSProperties,
   title: (muted: boolean, dismissed: boolean): CSSProperties => ({
@@ -26,18 +45,36 @@ export const s = {
     minWidth: 0,
   }),
   tag: (color: string): CSSProperties => ({ fontSize: 11.5, fontWeight: 600, color, flexShrink: 0 }),
-  chevron: (expanded: boolean): CSSProperties => ({
-    color: "var(--text-muted)",
-    transform: expanded ? "rotate(180deg)" : "none",
-    transition: "transform .15s",
-    flexShrink: 0,
-  }),
   body: { padding: "0 10px 10px" } satisfies CSSProperties,
+  meta: {
+    fontSize: 11.5,
+    color: "var(--text-muted)",
+    display: "flex",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 6,
+  } satisfies CSSProperties,
   prose: {
     fontSize: 13,
     lineHeight: 1.5,
     color: "var(--text-secondary)",
     marginTop: 8,
+  } satisfies CSSProperties,
+  suggestionBox: {
+    marginTop: 10,
+    border: "1px solid var(--border)",
+    borderRadius: 6,
+    padding: "8px 10px",
+  } satisfies CSSProperties,
+  suggestionHeading: {
+    display: "flex",
+    alignItems: "center",
+    gap: 5,
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
   } satisfies CSSProperties,
   actions: { display: "flex", gap: 8, marginTop: 10 } satisfies CSSProperties,
 } as const;

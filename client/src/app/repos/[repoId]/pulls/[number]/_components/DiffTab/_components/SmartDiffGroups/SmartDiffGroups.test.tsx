@@ -56,8 +56,8 @@ describe("SmartDiffGroups", () => {
   it("renders groups in role order with labels and per-group file counts; docs/boilerplate start collapsed and the counter counts files, not findings", () => {
     renderGroups();
 
-    const labels = screen.getAllByText(/^(Core|Tests|Docs|Boilerplate)$/);
-    expect(labels.map((el) => el.textContent)).toEqual(["Core", "Tests", "Docs", "Boilerplate"]);
+    const labels = screen.getAllByText(/^(Core logic|Tests|Docs|Boilerplate)$/);
+    expect(labels.map((el) => el.textContent)).toEqual(["Core logic", "Tests", "Docs", "Boilerplate"]);
 
     // core/tests start open: their files are already visible.
     expect(screen.getByText(CORE_A.path)).toBeInTheDocument();
@@ -67,12 +67,15 @@ describe("SmartDiffGroups", () => {
     expect(screen.queryByText(DOC_A.path)).not.toBeInTheDocument();
     expect(screen.queryByText(LOCK.path)).not.toBeInTheDocument();
 
-    // Core's counter: 2 files have findings (5 finding_lines total) → "● 2".
-    expect(screen.getByText("2")).toBeInTheDocument();
+    // Core's counter: 2 files have findings (5 finding_lines total), not 5.
+    expect(screen.getByLabelText("2 files with findings")).toBeInTheDocument();
     expect(screen.getByText("2 files")).toBeInTheDocument();
 
-    // Expand boilerplate → the lock file appears.
-    fireEvent.click(screen.getByText("Boilerplate"));
+    // Expand boilerplate → the lock file appears, and aria-expanded flips.
+    const boilerplateHeader = screen.getByRole("button", { name: /Boilerplate/ });
+    expect(boilerplateHeader).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(boilerplateHeader);
+    expect(boilerplateHeader).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText(LOCK.path)).toBeInTheDocument();
   });
 });

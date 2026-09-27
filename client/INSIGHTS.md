@@ -54,3 +54,9 @@ re-discovered the hard way.
 - **Insight:** `src/test/smoke.test.tsx` renders `DiffViewer` with only `{ shell: shellMessages }` in `NextIntlClientProvider`. Adding a second namespace to a component it renders doesn't fail that test — `next-intl` prints `IntlError: MISSING_MESSAGE` to stderr and renders the raw key/fallback, so the suite stays green while quietly breaking the missing namespace's UI.
 - **Do:** When a widely-rendered shared component (`components/**`, not a single feature) gains a new `useTranslations` namespace, grep for every other test/fixture that renders it (not just its own `*.test.tsx`) and add the namespace there too — a passing run doesn't prove the message resolved.
 - **Evidence:** `client/src/test/smoke.test.tsx`, `client/src/components/diff-viewer/CodeLine/CodeLine.tsx`.
+
+### 2026-09-27 · A `?? []` fallback on a `Map.get()` defeats the `useMemo` that consumes it
+- **Context:** `FileCard.tsx`'s `fileFindings = findings?.byPath.get(file.path) ?? []`, feeding a `useMemo([fileFindings, lines])` that partitions findings per rendered line.
+- **Insight:** When the file has no findings, `?? []` allocates a brand-new empty array literal on every render, so the `useMemo`'s dependency array never looks equal to the previous render's — it recomputes on every render even though "no findings" never changes.
+- **Do:** Give the "empty" case a single module-level constant (`const EMPTY: T[] = []`) and use that instead of an inline `?? []`, so the reference is stable across renders and the memo actually short-circuits.
+- **Evidence:** `client/src/components/diff-viewer/FileCard/FileCard.tsx` (`EMPTY`).

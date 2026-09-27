@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import type { PrFile } from "@/lib/types";
@@ -84,10 +84,11 @@ describe("DiffViewer — findings", () => {
     // The dot (aria-label "N finding(s)") appears once — only for the file with findings.
     expect(screen.getAllByLabelText(/finding\(s\)/i)).toHaveLength(1);
 
-    // Both cards render (show:true); the anchored one's card comes first in
-    // DOM order (its line, then the end-of-file block).
-    const acceptButtons = screen.getAllByText("Accept");
-    fireEvent.click(acceptButtons[0]!);
+    // Both cards render (show:true) — scope to the anchored card specifically
+    // (not "the first Accept button") so the assertion still holds if the
+    // end-of-file block ever renders before the inline one.
+    const anchoredCard = screen.getByText("Hardcoded secret").closest("[data-finding-id='anchored']");
+    fireEvent.click(within(anchoredCard as HTMLElement).getByRole("button", { name: "Accept" }));
     expect(onAction).toHaveBeenCalledWith("anchored", "accept");
   });
 
