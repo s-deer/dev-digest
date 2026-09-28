@@ -26,11 +26,11 @@ and deleted files.
 | fastify-best-practices | `server/src/modules/**/routes.ts` `server/src/modules/**/routes/**/*.ts` `server/src/app.ts` `server/src/server.ts` `server/src/platform/**/*.ts` | `**/*.test.ts` | |
 | drizzle-orm-patterns | `server/src/db/**/*.ts` `server/src/modules/**/repository.ts` `server/src/modules/**/repository/**/*.ts` `server/drizzle.config.ts` | `server/src/db/migrations/**` `**/*.test.ts` | |
 | postgresql-table-design | `server/src/db/schema.ts` `server/src/db/schema/**/*.ts` | | |
-| zod | `server/src/vendor/shared/**/*.ts` `client/src/vendor/shared/**/*.ts` `reviewer-core/src/**/*.ts` | | |
+| zod | `server/src/vendor/shared/**/*.ts` `client/src/vendor/shared/**/*.ts` `reviewer-core/src/**/*.ts` `mcp/src/**/*.ts` | | |
 | zod | `server/src/**/*.ts` `client/src/**/*.{ts,tsx}` | `**/*.test.{ts,tsx}` | `\bz\.(object\|enum\|union\|discriminatedUnion\|array\|string)\(` |
 | security | `server/src/modules/**/routes.ts` `server/src/modules/**/routes/**/*.ts` `server/src/platform/**/*.ts` `server/src/adapters/**/*.ts` `server/src/app.ts` | `**/*.test.ts` | |
-| security | `server/src/**/*.ts` `client/src/**/*.{ts,tsx}` `reviewer-core/src/**/*.ts` `scripts/**` | `**/*.test.{ts,tsx}` | `dangerouslySetInnerHTML\|innerHTML\s*=\|child_process\|\bexeca\b\|\beval\(\|new Function\(\|secrets\.json\|process\.env\.\|simple-git` |
-| typescript-expert | `reviewer-core/src/**/*.ts` `**/tsconfig*.json` `**/*.d.ts` | `**/next-env.d.ts` | |
+| security | `server/src/**/*.ts` `client/src/**/*.{ts,tsx}` `reviewer-core/src/**/*.ts` `mcp/src/**/*.ts` `scripts/**` | `**/*.test.{ts,tsx}` | `dangerouslySetInnerHTML\|innerHTML\s*=\|child_process\|\bexeca\b\|\beval\(\|new Function\(\|secrets\.json\|process\.env\.\|simple-git` |
+| typescript-expert | `reviewer-core/src/**/*.ts` `mcp/src/**/*.ts` `**/tsconfig*.json` `**/*.d.ts` | `**/next-env.d.ts` | |
 
 ## Not reviewers
 

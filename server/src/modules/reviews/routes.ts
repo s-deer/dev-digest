@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { RunRequest } from '@devdigest/shared';
+import { RunRequest, RunDetail, StartRunBody, StartRunResponse } from '@devdigest/shared';
 import type { RunEvent } from '@devdigest/shared';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
@@ -10,6 +10,8 @@ import { ReviewService } from './service.js';
 /**
  * reviews module.
  *   POST   /pulls/:id/review  {agentId} | {all:true}  → run review(s); returns runs
+ *   POST   /runs  {repo_id, pr_number, agent_id}       → start/reuse a run (MCP entry point)
+ *   GET    /runs/:id                                   → run status + cost + review outcome
  *   GET    /runs/:id/events                            → SSE stream of RunEvent (replay-first)
  *   GET    /runs/:id/trace                             → the single-document RunTrace
  *   GET    /pulls/:id/reviews                          → persisted reviews + findings for a PR
@@ -41,6 +43,33 @@ export default async function reviewsRoutes(appBase: FastifyInstance) {
       req.log,
     );
     return { pr_id: req.params.id, runs, reviews };
+  });
+
+  // ---- Start (or reuse) a run for one agent on a PR, addressed by repo + PR
+  // number instead of the pull's uuid — the MCP `run_agent_on_pr` tool's entry
+  // point. Same per-route limit as the pull-scoped variant above.
+  app.post(
+    '/runs',
+    {
+      schema: { body: StartRunBody, response: { 200: StartRunResponse, 201: StartRunResponse } },
+      config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    },
+    async (req, reply) => {
+      const { workspaceId } = await getContext(container, req);
+      const result = await service.startRun(workspaceId, {
+        repoId: req.body.repo_id,
+        prNumber: req.body.pr_number,
+        agentId: req.body.agent_id,
+      });
+      reply.code(result.reused ? 200 : 201);
+      return result;
+    },
+  );
+
+  // ---- Run detail: status + cost + (once done) review outcome + findings --
+  app.get('/runs/:id', { schema: { params: IdParams, response: { 200: RunDetail } } }, async (req) => {
+    const { workspaceId } = await getContext(container, req);
+    return service.getRunDetail(workspaceId, req.params.id);
   });
 
   // ---- SSE: live run events (replay buffer first, then live; ends on done) -

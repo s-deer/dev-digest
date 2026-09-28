@@ -1,6 +1,6 @@
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
-import type { Finding, FindingsSummary, RunSummary, RunTrace } from '@devdigest/shared';
+import type { Finding, FindingsSummary, RunDetail, RunSummary, RunTrace } from '@devdigest/shared';
 
 /**
  * A2 — review data-access. The ONLY layer touching the DB for the review
@@ -37,6 +37,12 @@ export class ReviewRepository {
 
   getPrFiles(prId: string): Promise<(typeof t.prFiles.$inferSelect)[]> {
     return pullRepo.getPrFiles(this.db, prId);
+  }
+
+  /** Resolve a PR by its GitHub number within a repo — the MCP `run_agent_on_pr`
+   *  entry point's way of addressing a PR (see `StartRunUseCase`). */
+  getPullByNumber(workspaceId: string, repoId: string, number: number): Promise<PullRow | undefined> {
+    return pullRepo.getPullByNumber(this.db, workspaceId, repoId, number);
   }
 
   // ---- reviews + findings -------------------------------------------------
@@ -108,6 +114,16 @@ export class ReviewRepository {
 
   hasRun(workspaceId: string, runId: string): Promise<boolean> {
     return runRepo.hasRun(this.db, workspaceId, runId);
+  }
+
+  /** Existing in-flight run for the same agent + PR, if any (dedupe). */
+  findRunningRun(workspaceId: string, prId: string, agentId: string): Promise<{ run_id: string } | undefined> {
+    return runRepo.findRunningRun(this.db, workspaceId, prId, agentId);
+  }
+
+  /** Status + cost + (once done) review outcome + findings for one run. */
+  getRunDetail(workspaceId: string, runId: string): Promise<RunDetail | undefined> {
+    return runRepo.getRunDetail(this.db, workspaceId, runId);
   }
 
   /** On boot: any run still 'running' is orphaned (its process died / restarted),

@@ -100,3 +100,55 @@ export type GenerateIntentBody = z.infer<typeof GenerateIntentBody>;
 /** Smart-diff response for a PR (the SmartDiff). */
 export const SmartDiffResponse = SmartDiff;
 export type SmartDiffResponse = z.infer<typeof SmartDiffResponse>;
+
+/**
+ * MCP-facing run flow (`POST /runs`, `GET /runs/:id`): a PR is addressed as
+ * `repo_id` + its GitHub number instead of the internal pull uuid, since the
+ * MCP server only knows `owner/name` + number. `run_id` is `agent_runs.id`.
+ */
+export const RunStatus = z.enum(['running', 'done', 'failed', 'cancelled']);
+export type RunStatus = z.infer<typeof RunStatus>;
+
+export const StartRunBody = z
+  .object({
+    repo_id: z.string(),
+    pr_number: z.number().int().positive(),
+    agent_id: z.string(),
+  })
+  .strict();
+export type StartRunBody = z.infer<typeof StartRunBody>;
+
+/** `reused: true` means an existing `running` run for the same agent + PR was
+ *  returned instead of starting a new one (server-side dedupe). */
+export const StartRunResponse = z.object({
+  run_id: z.string(),
+  status: RunStatus,
+  reused: z.boolean(),
+  pr_id: z.string(),
+  agent_id: z.string(),
+  agent_name: z.string(),
+});
+export type StartRunResponse = z.infer<typeof StartRunResponse>;
+
+/** Response of `GET /runs/:id`: status + cost, plus the review outcome and
+ *  findings once one was persisted for the run. */
+export const RunDetail = z.object({
+  run_id: z.string(),
+  status: RunStatus,
+  error: z.string().nullable(),
+  agent_id: z.string().nullable(),
+  agent_name: z.string().nullable(),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  pr_id: z.string(),
+  pr_number: z.number().int(),
+  repo_full_name: z.string(),
+  ran_at: z.string().nullable(),
+  duration_ms: z.number().int().nullable(),
+  cost_usd: z.number().nullable(),
+  score: z.number().int().nullable(),
+  verdict: Verdict.nullable(),
+  summary: z.string().nullable(),
+  findings: z.array(FindingRecord),
+});
+export type RunDetail = z.infer<typeof RunDetail>;
