@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Finding, Verdict } from './findings.js';
-import { PrIntent, SmartDiff } from './brief.js';
+import { BlastRadius, PrIntent, SmartDiff } from './brief.js';
 
 /**
  * A2 — Review-Core API surface contracts. These extend the core
@@ -100,6 +100,28 @@ export type GenerateIntentBody = z.infer<typeof GenerateIntentBody>;
 /** Smart-diff response for a PR (the SmartDiff). */
 export const SmartDiffResponse = SmartDiff;
 export type SmartDiffResponse = z.infer<typeof SmartDiffResponse>;
+
+/**
+ * Why the facade served a degraded blast radius (L04): the flag is off, the
+ * index build failed, the index is only partially built, the repo exceeded
+ * the indexer's size budget, or there's simply no data yet.
+ */
+export const BlastDegradedReason = z.enum([
+  'flag_off',
+  'index_failed',
+  'index_partial',
+  'repo_too_large',
+  'no_data',
+]);
+export type BlastDegradedReason = z.infer<typeof BlastDegradedReason>;
+
+/** Response of `GET /pulls/:id/blast`: the `BlastRadius` plus whether the
+ *  repo-intel facade served it from a degraded path, and why. */
+export const BlastRadiusResponse = BlastRadius.extend({
+  degraded: z.boolean(),
+  reason: BlastDegradedReason.nullable(),
+});
+export type BlastRadiusResponse = z.infer<typeof BlastRadiusResponse>;
 
 /**
  * MCP-facing run flow (`POST /runs`, `GET /runs/:id`): a PR is addressed as

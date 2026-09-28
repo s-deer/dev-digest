@@ -1,8 +1,10 @@
 import type {
   Agent,
+  BlastRadiusResponse,
   ConventionsState,
   ConventionStatus,
   FindingRecord,
+  PrMeta,
   Repo,
   RunDetail,
   StartRunResponse,
@@ -87,6 +89,46 @@ export function buildFinding(overrides: Partial<FindingRecord> = {}): FindingRec
   };
 }
 
+export function buildPrMeta(overrides: Partial<PrMeta> = {}): PrMeta {
+  return {
+    id: 'pr-1',
+    number: 482,
+    title: 'Add feature',
+    author: 'octocat',
+    branch: 'feature',
+    base: 'main',
+    head_sha: 'abc123',
+    additions: 12,
+    deletions: 3,
+    files_count: 2,
+    status: 'open',
+    opened_at: '2026-01-01T00:00:00.000Z',
+    updated_at: '2026-01-01T00:00:00.000Z',
+    score: null,
+    cost_usd: null,
+    findings: null,
+    ...overrides,
+  };
+}
+
+export function buildBlastRadiusResponse(overrides: Partial<BlastRadiusResponse> = {}): BlastRadiusResponse {
+  return {
+    changed_symbols: [{ name: 'reviewPr', file: 'src/modules/reviews/helpers.ts', kind: 'function' }],
+    downstream: [
+      {
+        symbol: 'reviewPr',
+        callers: [{ name: 'runReview', file: 'src/modules/reviews/service.ts', line: 42 }],
+        endpoints_affected: ['POST /runs'],
+        crons_affected: [],
+      },
+    ],
+    summary: '1 changed symbol, 1 caller, 1 endpoint affected.',
+    degraded: false,
+    reason: null,
+    ...overrides,
+  };
+}
+
 export function buildRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
   return {
     run_id: 'run-1',
@@ -117,10 +159,19 @@ export class FakeDevDigestApi implements DevDigestApi {
   conventionsByRepoId = new Map<string, ConventionsState>();
   startRunResponse: StartRunResponse = buildStartRunResponse();
   runsById = new Map<string, RunDetail>();
+  pullsByRepoId = new Map<string, PrMeta[]>();
+  blastByPrId = new Map<string, BlastRadiusResponse>();
+  /** Records every `prId` passed to `getBlastRadius`, so a test can assert
+   *  it was called once with the resolved PR's id. */
+  blastCalls: string[] = [];
   failWith: Error | null = null;
   /** Fails only `startRun`, independent of `failWith` — so a test can make
    *  `resolveRepo`'s `listRepos()` call succeed while `startRun` itself fails. */
   startRunFailWith: Error | null = null;
+  /** Fails only `listPulls`, independent of `failWith` — same reason. */
+  listPullsFailWith: Error | null = null;
+  /** Fails only `getBlastRadius`, independent of `failWith` — same reason. */
+  getBlastRadiusFailWith: Error | null = null;
 
   async listAgents(): Promise<Agent[]> {
     if (this.failWith) throw this.failWith;
@@ -152,5 +203,20 @@ export class FakeDevDigestApi implements DevDigestApi {
     const detail = this.runsById.get(runId);
     if (!detail) throw new ApiError('not_found', `Run ${runId} not found.`);
     return detail;
+  }
+
+  async listPulls(repoId: string): Promise<PrMeta[]> {
+    if (this.listPullsFailWith) throw this.listPullsFailWith;
+    if (this.failWith) throw this.failWith;
+    return this.pullsByRepoId.get(repoId) ?? [];
+  }
+
+  async getBlastRadius(prId: string): Promise<BlastRadiusResponse> {
+    this.blastCalls.push(prId);
+    if (this.getBlastRadiusFailWith) throw this.getBlastRadiusFailWith;
+    if (this.failWith) throw this.failWith;
+    const blast = this.blastByPrId.get(prId);
+    if (!blast) throw new ApiError('not_found', `Blast radius for PR ${prId} not found.`);
+    return blast;
   }
 }

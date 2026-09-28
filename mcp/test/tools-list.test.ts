@@ -4,14 +4,18 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 import { createServer } from '../src/server.js';
-import { FakeDevDigestApi } from './fakes.js';
+import { buildBlastRadiusResponse, buildPrMeta, buildRepo, FakeDevDigestApi } from './fakes.js';
 
-// Tool order without the flag, pinned by Phase 1–2 (`test/tools.test.ts`
-// already asserts this same order for the flagless server). Phase 3 only
-// adds `get_blast_radius`, always last, behind the flag.
-const BASE_ORDER = ['list_agents', 'get_conventions', 'run_agent_on_pr', 'get_findings'];
+// Fixed tool order, pinned since Phase 1–2 (`test/tools.test.ts` asserts the
+// same order). `get_blast_radius` is now a real tool, always registered last
+// (Phase 3, S14 — the flag was removed by user decision; see mcp/README.md).
+const TOOL_ORDER = ['list_agents', 'get_conventions', 'run_agent_on_pr', 'get_findings', 'get_blast_radius'];
 const NAME_PATTERN = /^[a-z][a-z_]*$/;
-const MAX_TOOLS_LIST_CHARS = 7000;
+// Measured 2026-09-28 with all 5 tools always registered: 7313 chars
+// (~1828 tokens at chars/4) — see mcp/INSIGHTS.md. Budget raised from the
+// prior flag-off 7000-char ceiling to 8000 (measured + a small margin), since
+// get_blast_radius is no longer optional.
+const MAX_TOOLS_LIST_CHARS = 8000;
 const MAX_DESCRIPTION_CHARS = 300;
 const MAX_INSTRUCTIONS_CHARS = 600;
 
@@ -24,12 +28,8 @@ const ANNOTATIONS_BY_TOOL: Record<string, typeof READ_ONLY_ANNOTATIONS | Record<
   run_agent_on_pr: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
 };
 
-async function connectedClient(config: {
-  apiUrl: string;
-  enableBlastRadius: boolean;
-  requestTimeoutMs: number;
-}): Promise<{ client: Client; server: McpServer }> {
-  const server = createServer({ api: new FakeDevDigestApi(), config });
+async function connectedClient(api: FakeDevDigestApi = new FakeDevDigestApi()): Promise<{ client: Client; server: McpServer }> {
+  const server = createServer({ api, config: { apiUrl: 'http://localhost:3001', requestTimeoutMs: 15_000 } });
   const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test-client', version: '0.0.0' }, { capabilities: {} });
   await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
@@ -40,50 +40,30 @@ describe('tools/list budget and shape', () => {
   let client: Client;
   let server: McpServer;
 
-  async function connect(enableBlastRadius: boolean) {
-    ({ client, server } = await connectedClient({
-      apiUrl: 'http://localhost:3001',
-      enableBlastRadius,
-      requestTimeoutMs: 15_000,
-    }));
-  }
+  beforeEach(async () => {
+    ({ client, server } = await connectedClient());
+  });
 
   afterEach(async () => {
     await client.close();
     await server.close();
   });
 
-  it('lists the base tools in a fixed order, without the stub, when the flag is off', async () => {
-    await connect(false);
+  it('lists all five tools in a fixed order', async () => {
     const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name)).toEqual(BASE_ORDER);
-    expect(tools.find((t) => t.name === 'get_blast_radius')).toBeUndefined();
+    expect(tools.map((t) => t.name)).toEqual(TOOL_ORDER);
   });
 
-  it('appends get_blast_radius last when the flag is on', async () => {
-    await connect(true);
-    const { tools } = await client.listTools();
-    expect(tools.map((t) => t.name)).toEqual([...BASE_ORDER, 'get_blast_radius']);
-  });
-
-  it('stays within the tools/list token budget at session start (flag off)', async () => {
-    // "Cheap at session start" (Phase 3 goal) means the default, flag-off
-    // tools/list — `get_blast_radius` is opt-in and adds a 5th tool only
-    // when a developer sets DEVDIGEST_MCP_ENABLE_BLAST_RADIUS=1. Budget
-    // raised from 5000 to 7000 by user decision (see mcp/INSIGHTS.md): at
-    // 5000, every tool/param description had to be stripped, which cost
-    // model accuracy for ~300 tokens of savings. Measured 2026-09-27, with
-    // verb-first tool descriptions and `.describe()` on key params restored:
-    // 5813 chars (~1454 tokens at chars/4) for 4 tools; 6423 chars
-    // (~1606 tokens) for 5 with the flag on.
-    await connect(false);
+  it('stays within the tools/list token budget at session start', async () => {
+    // Budget raised from 7000 to 8000 because get_blast_radius is now always
+    // registered — there is no flag-off, cheaper tools/list anymore. See
+    // mcp/INSIGHTS.md for the measured size and the reasoning.
     const { tools } = await client.listTools();
     const serialized = JSON.stringify(tools);
     expect(serialized.length).toBeLessThanOrEqual(MAX_TOOLS_LIST_CHARS);
   });
 
   it('keeps every tool description within 300 chars', async () => {
-    await connect(true);
     const { tools } = await client.listTools();
     for (const tool of tools) {
       expect((tool.description ?? '').length).toBeLessThanOrEqual(MAX_DESCRIPTION_CHARS);
@@ -91,7 +71,6 @@ describe('tools/list budget and shape', () => {
   });
 
   it('never emits $schema, $defs or $ref in any tool schema', async () => {
-    await connect(true);
     const { tools } = await client.listTools();
     const serialized = JSON.stringify(tools);
     expect(serialized).not.toContain('$schema');
@@ -100,14 +79,12 @@ describe('tools/list budget and shape', () => {
   });
 
   it('gives list_agents a closed, additionalProperties:false input schema', async () => {
-    await connect(false);
     const { tools } = await client.listTools();
     const listAgents = tools.find((t) => t.name === 'list_agents') as Tool;
     expect(listAgents.inputSchema).toMatchObject({ type: 'object', additionalProperties: false });
   });
 
   it('matches the read-only/destructive/idempotent/openWorld annotation matrix', async () => {
-    await connect(true);
     const { tools } = await client.listTools();
     for (const tool of tools) {
       expect(tool.annotations).toMatchObject(ANNOTATIONS_BY_TOOL[tool.name]!);
@@ -115,13 +92,11 @@ describe('tools/list budget and shape', () => {
   });
 
   it('keeps server instructions within 600 chars', async () => {
-    await connect(false);
     const instructions = client.getInstructions() ?? '';
     expect(instructions.length).toBeLessThanOrEqual(MAX_INSTRUCTIONS_CHARS);
   });
 
   it('names every tool in snake_case with no devdigest_ prefix', async () => {
-    await connect(true);
     const { tools } = await client.listTools();
     for (const tool of tools) {
       expect(tool.name).toMatch(NAME_PATTERN);
@@ -130,16 +105,14 @@ describe('tools/list budget and shape', () => {
   });
 });
 
-describe('get_blast_radius stub', () => {
+describe('get_blast_radius', () => {
+  let api: FakeDevDigestApi;
   let client: Client;
   let server: McpServer;
 
   beforeEach(async () => {
-    ({ client, server } = await connectedClient({
-      apiUrl: 'http://localhost:3001',
-      enableBlastRadius: true,
-      requestTimeoutMs: 15_000,
-    }));
+    api = new FakeDevDigestApi();
+    ({ client, server } = await connectedClient(api));
   });
 
   afterEach(async () => {
@@ -147,13 +120,20 @@ describe('get_blast_radius stub', () => {
     await server.close();
   });
 
-  it('always returns isError pointing at get_findings', async () => {
+  it('is a real tool with an outputSchema and returns structured content', async () => {
+    const { tools } = await client.listTools();
+    const tool = tools.find((t) => t.name === 'get_blast_radius') as Tool;
+    expect(tool.outputSchema).toBeDefined();
+
+    api.repos = [buildRepo({ id: 'r1', full_name: 'acme/payments-api' })];
+    api.pullsByRepoId.set('r1', [buildPrMeta({ id: 'pr-1', number: 482 })]);
+    api.blastByPrId.set('pr-1', buildBlastRadiusResponse());
+
     const result = await client.callTool({
       name: 'get_blast_radius',
       arguments: { repo: 'acme/payments-api', prNumber: 482 },
     });
-    expect(result.isError).toBe(true);
-    const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
-    expect(text).toBe('get_blast_radius is not implemented yet. Use get_findings for review results.');
+    expect(result.isError).toBeFalsy();
+    expect(result.structuredContent).toBeDefined();
   });
 });

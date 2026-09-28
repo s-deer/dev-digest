@@ -13,9 +13,10 @@ import {
   fitToBudget,
   shapeFindings,
 } from '../src/format/findings.js';
+import { formatBlast } from '../src/format/blast.js';
 import { wrapUntrustedJson } from '../src/format/untrusted.js';
 import { apiErrorResult, errorResult, okResult, untrustedResult } from '../src/format/result.js';
-import { buildConventionsState, buildFinding, buildRunDetail } from './fakes.js';
+import { buildBlastRadiusResponse, buildConventionsState, buildFinding, buildRunDetail } from './fakes.js';
 
 function buildCandidate(overrides: Partial<ConventionCandidate> = {}): ConventionCandidate {
   return {
@@ -171,6 +172,50 @@ describe('shapeFindings', () => {
     expect(done.hint).toBeUndefined();
     expect(done.cost_usd).toBe(0.02);
     expect(done.verdict).toBe('approve');
+  });
+});
+
+describe('formatBlast', () => {
+  const context = { repo: 'acme/payments-api', prNumber: 482 };
+
+  it('flattens changed symbols and callers, and passes through summary/degraded/reason', () => {
+    const blast = buildBlastRadiusResponse();
+
+    const formatted = formatBlast(blast, context);
+
+    expect(formatted.repo).toBe('acme/payments-api');
+    expect(formatted.prNumber).toBe(482);
+    expect(formatted.summary).toBe(blast.summary);
+    expect(formatted.degraded).toBe(false);
+    expect(formatted.reason).toBeNull();
+    expect(formatted.changedSymbols).toEqual(['reviewPr (src/modules/reviews/helpers.ts)']);
+    expect(formatted.downstream).toEqual([
+      {
+        symbol: 'reviewPr',
+        callers: ['src/modules/reviews/service.ts:42 runReview'],
+        endpoints: ['POST /runs'],
+        crons: [],
+      },
+    ]);
+    expect(formatted.hint).toBeUndefined();
+  });
+
+  it('adds a resync hint when the data is degraded', () => {
+    const blast = buildBlastRadiusResponse({ degraded: true, reason: 'index_partial' });
+
+    const formatted = formatBlast(blast, context);
+
+    expect(formatted.hint).toMatch(/resync/i);
+  });
+
+  it('adds an import hint when there are zero changed symbols, but no resync hint when not degraded', () => {
+    const blast = buildBlastRadiusResponse({ changed_symbols: [], downstream: [] });
+
+    const formatted = formatBlast(blast, context);
+
+    expect(formatted.changedSymbols).toEqual([]);
+    expect(formatted.downstream).toEqual([]);
+    expect(formatted.hint).toMatch(/open this pr in devdigest/i);
   });
 });
 

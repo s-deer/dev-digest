@@ -67,7 +67,7 @@ npm run inspect    # MCP Inspector against the real stdio server
   `stripJsonSchemaMetaFromToolsList` last, after every tool is registered — do
   the same if you add a way to register tools outside `createServer`.
 - **`tools/list` has a hard character budget** (`test/tools-list.test.ts`,
-  currently 7000 chars with the flag off). Adding a tool, a param, or a
+  currently 8000 chars for all 5 tools). Adding a tool, a param, or a
   `.describe()` can blow it — rerun that test before shipping a new tool or
   schema change.
 

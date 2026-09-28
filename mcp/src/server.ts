@@ -17,9 +17,8 @@ export interface CreateServerOptions {
 }
 
 /**
- * Ring 4 (SDK registration). Tool order is fixed across phases — Phase 3's
- * budget test pins it, and `get_blast_radius` is always registered last,
- * behind its flag.
+ * Ring 4 (SDK registration). Tool order is fixed across phases — the budget
+ * test pins it, and `get_blast_radius` is always registered last.
  */
 export function createServer({ api, config }: CreateServerOptions): McpServer {
   const server = new McpServer(
@@ -31,7 +30,7 @@ export function createServer({ api, config }: CreateServerOptions): McpServer {
   registerGetConventionsTool(server, api);
   registerRunAgentOnPrTool(server, api);
   registerGetFindingsTool(server, api);
-  if (config.enableBlastRadius) registerGetBlastRadiusTool(server);
+  registerGetBlastRadiusTool(server, api);
   stripJsonSchemaMetaFromToolsList(server);
 
   return server;

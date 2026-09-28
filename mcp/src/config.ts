@@ -6,8 +6,6 @@
 export interface McpConfig {
   /** Base URL of the DevDigest Fastify API, no trailing slash. */
   apiUrl: string;
-  /** `DEVDIGEST_MCP_ENABLE_BLAST_RADIUS=1` gates the Phase-3 stub tool. */
-  enableBlastRadius: boolean;
   /** Per-request timeout for the HTTP adapter. */
   requestTimeoutMs: number;
 }
@@ -34,7 +32,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): McpConfig {
 
   return {
     apiUrl: rawUrl.replace(/\/+$/, ''),
-    enableBlastRadius: env.DEVDIGEST_MCP_ENABLE_BLAST_RADIUS === '1',
     requestTimeoutMs: REQUEST_TIMEOUT_MS,
   };
 }

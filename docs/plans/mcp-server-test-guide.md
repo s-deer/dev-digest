@@ -14,9 +14,8 @@
 What you are testing:
 - A stdio process in `mcp/`, started by Claude Code through `.mcp.json` (`npm --prefix mcp run -s start`). It listens on no ports.
 - A thin HTTP adapter over the API on `:3001`.
-- 4 tools: `list_agents`, `get_conventions`, `run_agent_on_pr`, `get_findings`.
-- `get_blast_radius`, which appears only when `DEVDIGEST_MCP_ENABLE_BLAST_RADIUS=1` is set.
-- The new server routes `POST /runs` and `GET /runs/:id`.
+- 5 tools, always registered: `list_agents`, `get_conventions`, `run_agent_on_pr`, `get_findings`, `get_blast_radius`.
+- The new server routes `POST /runs` and `GET /runs/:id`, and `GET /pulls/:id/blast`.
 
 ## Rules
 
@@ -40,7 +39,7 @@ cd .. && diff server/src/vendor/shared/contracts/review-api.ts client/src/vendor
 ```
 
 Expected:
-- `mcp`: all tests green (about 61), including `test/tools-list.test.ts`, which checks order, budget, and the absence of `$schema`.
+- `mcp`: all tests green (about 69), including `test/tools-list.test.ts`, which checks order, budget, and the absence of `$schema`.
 - `server`: typecheck is clean and the unit lane is green.
 - The it-tests pass, or are SKIPPED if Docker isn't available. Write down which of the two happened.
 - The two contract copies are identical.
@@ -107,7 +106,7 @@ Skeleton:
 ```js
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
-const env = { ...process.env /*, DEVDIGEST_MCP_ENABLE_BLAST_RADIUS: '1' */ };
+const env = { ...process.env };
 const p = spawn('npm', ['--prefix', 'mcp', 'run', '-s', 'start'], { cwd: REPO_ROOT, env });
 const pending = new Map(); let id = 0;
 readline.createInterface({ input: p.stdout }).on('line', (l) => {
@@ -125,9 +124,9 @@ const notify = (method) => p.stdin.write(JSON.stringify({ jsonrpc: '2.0', method
 
 | # | Check | Expected |
 |---|---|---|
-| 3.1 | Tool order | `list_agents, get_conventions, run_agent_on_pr, get_findings` |
-| 3.2 | `get_blast_radius` without the flag | absent |
-| 3.3 | `JSON.stringify(result.tools).length` | ≤ 7000 (about 5800 expected). Record the number and ≈ tokens (chars/4) |
+| 3.1 | Tool order | `list_agents, get_conventions, run_agent_on_pr, get_findings, get_blast_radius` |
+| 3.2 | `get_blast_radius` is present (no flag — always registered) | present, last |
+| 3.3 | `JSON.stringify(result.tools).length` | ≤ 8000 (about 7300 expected). Record the number and ≈ tokens (chars/4) |
 | 3.4 | No `"$schema"`, `"$defs"` or `"$ref"` in the serialized tools | none |
 | 3.5 | `list_agents.inputSchema` | `{type:"object", ..., additionalProperties:false}` |
 | 3.6 | Descriptions | each ≤300 chars, verb first, and says what to call next |
@@ -149,6 +148,7 @@ const notify = (method) => p.stdin.write(JSON.stringify({ jsonrpc: '2.0', method
 | 3.17 | `get_findings {runId, minSeverity:"CRITICAL"}` / `{limit:1}` → then `{cursor: nextCursor}` | filtering and pagination work; `nextCursor` disappears on the last page |
 | 3.18 | `get_findings {runId, response_format:"detailed"}` | full rationale and suggestion are present |
 | 3.19 | Response sizes | not a single response is anywhere near 10k tokens (Claude Code's warning threshold). Record the largest one |
+| 3.19a | `get_blast_radius {repo:"acme/payments-api", prNumber:482}` (PR already opened once in DevDigest, i.e. `GET /pulls/:id` was called) | `structuredContent` has `repo, prNumber, summary, degraded, reason, changedSymbols[], downstream[]`; `changedSymbols` items read `"name (file)"`, each `downstream[].callers` item reads `"file:line name"`. Fenced as `<untrusted_data>` |
 
 ### 3C. Errors and negative cases (a tool must return `isError:true` with actionable text, not crash)
 
@@ -163,13 +163,15 @@ const notify = (method) => p.stdin.write(JSON.stringify({ jsonrpc: '2.0', method
 | 3.26 | **Stop the API** (kill the process on :3001), then call `list_agents` and `get_conventions` | `isError` with the text `DevDigest API is not reachable at http://localhost:3001. Start the API with ./scripts/dev.sh…`. The hint appears **once**. `tools/list` still works |
 | 3.27 | `DEVDIGEST_API_URL=file:///x` at startup | the process exits with a clear error on stderr and doesn't hang |
 | 3.28 | A run in `failed` state (if you got one) | `hint` contains the error text and "check the provider key" |
+| 3.29 | `get_blast_radius {repo:"acme/payments-api", prNumber:99999}` (unknown PR number) | `isError`, text contains `PR #99999 is not in DevDigest for acme/payments-api.` plus "Open this PR in DevDigest once…" |
+| 3.30 | `get_blast_radius {repo:"nope/nope", prNumber:1}` (unknown repo) | `isError`, lists the imported repos |
 
-### 3D. Blast-radius flag
+### 3D. Blast radius on a never-opened PR (fallback/degraded path)
 
 | # | Check | Expected |
 |---|---|---|
-| 3.29 | Start with `DEVDIGEST_MCP_ENABLE_BLAST_RADIUS=1` → `tools/list` | 5 tools, `get_blast_radius` **last**, still no `$schema` |
-| 3.30 | `get_blast_radius {repo:"acme/payments-api", prNumber:482}` | `isError:true`, "not implemented yet. Use get_findings…" |
+| 3.29a | `get_blast_radius` on a PR imported via `GET /repos/:id/pulls` but never opened via `GET /pulls/:id` | `pr_files` is empty server-side, so `downstream[].endpoints`/`.crons` are `[]`; if `changedSymbols` is also `[]`, `hint` says to open the PR in DevDigest once |
+| 3.29b | `get_blast_radius` when the repo-intel index is degraded (flag off, failed, or partial) | `degraded:true`, `reason` is one of `flag_off\|index_failed\|index_partial\|repo_too_large\|no_data`, `hint` suggests a resync |
 
 ### 3E. Security (optional but desirable)
 
@@ -205,7 +207,7 @@ Reply in one message:
 1. **Summary:** PASS / PASS with remarks / FAIL, in one line.
 2. **Table of every check** (IDs 1.x, 2.x, 3.x, 4.x): `ID | check | PASS/FAIL/SKIPPED | evidence (command + short excerpt of the output)`.
 3. **Measurements:**
-   - `tools/list` size in chars and ≈tokens, with the flag off and on.
+   - `tools/list` size in chars and ≈tokens (all 5 tools, always registered).
    - Size of the largest response.
    - Token figure from `/context`.
    - How long a run took to go from `running` to `done`.

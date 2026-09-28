@@ -19,6 +19,7 @@ function buildDegradedService(opts: {
   flag: boolean;
   basics?: RepoBasics | null;
   indexStateRow?: IndexState | null;
+  symbolRows?: unknown[];
 }): RepoIntelService {
   const container = {
     config: { repoIntelEnabled: opts.flag },
@@ -36,8 +37,26 @@ function buildDegradedService(opts: {
     getCachedSymbols: async () => [],
     getCachedSymbolsForFiles: async () => [],
     getCachedReferencesTo: async () => [],
+    getSymbolRows: async () => opts.symbolRows ?? [],
+    getResolvedCallers: async () => [],
+    getFileFacts: async () => [],
   };
   return svc;
+}
+
+/** Minimal `IndexState` fixture — only the fields `getBlastRadius` reads. */
+function indexState(overrides: Partial<IndexState>): IndexState {
+  return {
+    repoId: 'r1',
+    status: 'failed',
+    filesIndexed: 0,
+    filesSkipped: 0,
+    durationMs: 0,
+    lastIndexedSha: '',
+    indexerVersion: 2,
+    updatedAt: new Date(0),
+    ...overrides,
+  };
 }
 
 describe('RepoIntel facade — degraded contract (flag off)', () => {
@@ -121,5 +140,71 @@ describe('RepoIntel facade — degraded contract (flag on, but no data)', () => 
   it('getCallerSignatures with empty changedFiles → []', async () => {
     const svc = buildDegradedService({ flag: true, basics: { id: 'r1', owner: 'a', name: 'b', clonePath: '/tmp' } });
     await expect(svc.getCallerSignatures('r1', [])).resolves.toEqual([]);
+  });
+});
+
+describe('RepoIntel facade — getBlastRadius honest degradation (T1.4 / L04 S2)', () => {
+  it('reason is flag_off when repoIntelEnabled=false, even over a failed index state', async () => {
+    const svc = buildDegradedService({
+      flag: false,
+      basics: null,
+      indexStateRow: indexState({ status: 'failed', degradedReason: 'repo_too_large' }),
+    });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(true);
+    expect(blast.reason).toBe('flag_off');
+  });
+
+  it('fallback reason is index_failed when the persisted index state is failed', async () => {
+    const svc = buildDegradedService({
+      flag: true,
+      basics: null, // no clone → falls through to the empty fallback
+      indexStateRow: indexState({ status: 'failed' }),
+    });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(true);
+    expect(blast.reason).toBe('index_failed');
+  });
+
+  it('fallback reason defaults to no_data with no persisted index state at all', async () => {
+    const svc = buildDegradedService({ flag: true, basics: null, indexStateRow: null });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(true);
+    expect(blast.reason).toBe('no_data');
+  });
+
+  it('a partial persistent index reports degraded:true, reason:index_partial (no symbols in changed files)', async () => {
+    const svc = buildDegradedService({
+      flag: true,
+      indexStateRow: indexState({ status: 'partial' }),
+      symbolRows: [],
+    });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(true);
+    expect(blast.reason).toBe('index_partial');
+    expect(blast.callers).toEqual([]);
+  });
+
+  it('a partial persistent index reports degraded:true, reason:index_partial (with symbols found)', async () => {
+    const svc = buildDegradedService({
+      flag: true,
+      indexStateRow: indexState({ status: 'partial' }),
+      symbolRows: [{ path: 'a.ts', name: 'foo', kind: 'function', line: 1, endLine: 5, exported: true, signature: null }],
+    });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(true);
+    expect(blast.reason).toBe('index_partial');
+    expect(blast.changedSymbols).toEqual([{ file: 'a.ts', name: 'foo', kind: 'function' }]);
+  });
+
+  it('a full persistent index is not degraded', async () => {
+    const svc = buildDegradedService({
+      flag: true,
+      indexStateRow: indexState({ status: 'full' }),
+      symbolRows: [],
+    });
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.degraded).toBe(false);
+    expect(blast.reason).toBeUndefined();
   });
 });

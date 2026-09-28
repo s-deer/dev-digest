@@ -6,14 +6,16 @@ import { createServer } from '../src/server.js';
 import { ApiError } from '../src/api/errors.js';
 import {
   buildAgent,
+  buildBlastRadiusResponse,
   buildFinding,
+  buildPrMeta,
   buildRepo,
   buildRunDetail,
   buildStartRunResponse,
   FakeDevDigestApi,
 } from './fakes.js';
 
-const config = { apiUrl: 'http://localhost:3001', enableBlastRadius: false, requestTimeoutMs: 15_000 };
+const config = { apiUrl: 'http://localhost:3001', requestTimeoutMs: 15_000 };
 
 // `agentId`/`runId` are validated as uuids by the tool input schemas.
 const AGENT_ID = '11111111-1111-1111-1111-111111111111';
@@ -45,13 +47,14 @@ describe('devdigest mcp tools', () => {
     await server.close();
   });
 
-  it('lists all four tools in order', async () => {
+  it('lists all five tools in order', async () => {
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name)).toEqual([
       'list_agents',
       'get_conventions',
       'run_agent_on_pr',
       'get_findings',
+      'get_blast_radius',
     ]);
   });
 
@@ -312,6 +315,85 @@ describe('devdigest mcp tools', () => {
     it('gives isError for an unknown run', async () => {
       const result = await client.callTool({ name: 'get_findings', arguments: { runId: RUN_MISSING } });
       expect(result.isError).toBe(true);
+    });
+  });
+
+  describe('get_blast_radius', () => {
+    it('returns the formatted blast radius, fenced as untrusted, and calls the API once with the resolved PR id', async () => {
+      api.repos = [buildRepo({ id: 'r1', full_name: 'acme/payments-api' })];
+      api.pullsByRepoId.set('r1', [buildPrMeta({ id: 'pr-1', number: 482 })]);
+      api.blastByPrId.set('pr-1', buildBlastRadiusResponse());
+
+      const result = await client.callTool({
+        name: 'get_blast_radius',
+        arguments: { repo: 'acme/payments-api', prNumber: 482 },
+      });
+
+      expect(result.isError).toBeFalsy();
+      const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
+      expect(text.startsWith('<untrusted_data>')).toBe(true);
+      expect(result.structuredContent).toEqual({
+        repo: 'acme/payments-api',
+        prNumber: 482,
+        summary: '1 changed symbol, 1 caller, 1 endpoint affected.',
+        degraded: false,
+        reason: null,
+        changedSymbols: ['reviewPr (src/modules/reviews/helpers.ts)'],
+        downstream: [
+          {
+            symbol: 'reviewPr',
+            callers: ['src/modules/reviews/service.ts:42 runReview'],
+            endpoints: ['POST /runs'],
+            crons: [],
+          },
+        ],
+      });
+      expect(api.blastCalls).toEqual(['pr-1']);
+    });
+
+    it('gives isError with a not-in-DevDigest message and hint for an unknown PR number', async () => {
+      api.repos = [buildRepo({ id: 'r1', full_name: 'acme/payments-api' })];
+      api.pullsByRepoId.set('r1', [buildPrMeta({ id: 'pr-1', number: 482 })]);
+
+      const result = await client.callTool({
+        name: 'get_blast_radius',
+        arguments: { repo: 'acme/payments-api', prNumber: 999 },
+      });
+
+      expect(result.isError).toBe(true);
+      const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
+      expect(text).toContain('PR #999 is not in DevDigest for acme/payments-api.');
+      expect(text).toContain('Open this PR in DevDigest once');
+      expect(api.blastCalls).toEqual([]);
+    });
+
+    it('gives isError listing imported repos for an unknown repo', async () => {
+      api.repos = [buildRepo({ full_name: 'acme/known-repo' })];
+      const result = await client.callTool({
+        name: 'get_blast_radius',
+        arguments: { repo: 'acme/unknown', prNumber: 1 },
+      });
+      expect(result.isError).toBe(true);
+      const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
+      expect(text).toContain('acme/known-repo');
+    });
+
+    it('adds the not-in-DevDigest hint once on a 404 from getBlastRadius', async () => {
+      api.repos = [buildRepo({ id: 'r1', full_name: 'acme/payments-api' })];
+      api.pullsByRepoId.set('r1', [buildPrMeta({ id: 'pr-1', number: 482 })]);
+      // `getBlastRadiusFailWith` (not `failWith`) so resolveRepo/listPulls
+      // still succeed and only the getBlastRadius call itself fails.
+      api.getBlastRadiusFailWith = new ApiError('not_found', 'Pull request not found');
+
+      const result = await client.callTool({
+        name: 'get_blast_radius',
+        arguments: { repo: 'acme/payments-api', prNumber: 482 },
+      });
+
+      expect(result.isError).toBe(true);
+      const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
+      const hintCount = text.split('Open this PR in DevDigest once').length - 1;
+      expect(hintCount).toBe(1);
     });
   });
 });

@@ -1,8 +1,10 @@
 import {
   Agent,
   ApiErrorBody,
+  BlastRadiusResponse,
   ConventionsState,
   ConventionStatus,
+  PrMeta,
   Repo,
   RunDetail,
   StartRunResponse,
@@ -60,6 +62,18 @@ export class HttpDevDigestApi implements DevDigestApi {
     const path = `/runs/${encodeURIComponent(runId)}`;
     const body = await this.request(path);
     return this.parse(RunDetail, body, `GET ${path}`);
+  }
+
+  async listPulls(repoId: string): Promise<PrMeta[]> {
+    const path = `/repos/${encodeURIComponent(repoId)}/pulls`;
+    const body = await this.request(path);
+    return this.parse(PrMeta.array(), body, `GET ${path}`);
+  }
+
+  async getBlastRadius(prId: string): Promise<BlastRadiusResponse> {
+    const path = `/pulls/${encodeURIComponent(prId)}/blast`;
+    const body = await this.request(path);
+    return this.parse(BlastRadiusResponse, body, `GET ${path}`);
   }
 
   private async request(path: string, init: { method?: 'GET' | 'POST'; body?: unknown } = {}): Promise<unknown> {

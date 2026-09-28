@@ -72,6 +72,7 @@ flowchart TB
     reviews["reviews<br/>/pulls/:id/review · /reviews · /findings/:id/(accept|dismiss)<br/>/runs/:id/(events|trace) · POST /runs · GET /runs/:id"]
     intent["intent<br/>/pulls/:id/intent (GET · POST)"]
     smartDiff["smart-diff<br/>/pulls/:id/smart-diff (GET)"]
+    blast["blast<br/>/pulls/:id/blast (GET)"]
   end
    subgraph Agents["Agents"]
     agents["agents<br/>/agents · /agents/:id"]

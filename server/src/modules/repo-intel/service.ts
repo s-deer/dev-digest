@@ -33,6 +33,7 @@ import type {
   BlastCallerRow,
   BlastChangedSymbol,
   BlastResult,
+  DegradedReason,
   FileRankRow,
   IndexResult,
   IndexState,
@@ -223,19 +224,24 @@ export class RepoIntelService implements RepoIntel {
    * clone (not the index). T2 promotes this path to the persistent layer.
    */
   async getBlastRadius(repoId: string, changedFiles: string[]): Promise<BlastResult> {
+    // Read the index state once so both the persistent path and the
+    // ripgrep fallback below branch on the same snapshot.
+    const state = await this.repo.tryGetIndexState(repoId);
+
     // T3: serve from the persistent index when it's built. Falls through to the
     // ripgrep best-effort below when the flag is off / index is absent.
     if (this.container.config.repoIntelEnabled && changedFiles.length > 0) {
-      const persistent = await this.tryPersistentBlast(repoId, changedFiles);
+      const persistent = await this.tryPersistentBlast(repoId, changedFiles, state);
       if (persistent) return persistent;
     }
 
+    const reason = fallbackBlastReason(this.container.config.repoIntelEnabled, state);
     const empty: BlastResult = {
       changedSymbols: [],
       callers: [],
       impactedEndpoints: [],
       degraded: true,
-      reason: 'no_data',
+      reason,
     };
 
     const repo = await this.repo.getRepoBasics(repoId);
@@ -304,7 +310,7 @@ export class RepoIntelService implements RepoIntel {
       callers: callerRows,
       impactedEndpoints: [...endpoints],
       degraded: true,
-      reason: 'no_data',
+      reason,
     };
   }
 
@@ -320,9 +326,12 @@ export class RepoIntelService implements RepoIntel {
   private async tryPersistentBlast(
     repoId: string,
     changedFiles: string[],
+    state: IndexState | null,
   ): Promise<BlastResult | null> {
-    const state = await this.repo.tryGetIndexState(repoId);
     if (!state || (state.status !== 'full' && state.status !== 'partial')) return null;
+    // A 'partial' index is still usable, but it's honest to flag it: some
+    // files/symbols may be missing from the graph.
+    const partial = state.status === 'partial';
 
     // Changed symbols = declared in a changed file. Skip the qualified
     // `Class.method` dual-emit (the bare form already covers the name).
@@ -340,7 +349,13 @@ export class RepoIntelService implements RepoIntel {
       nameSet.add(s.name);
     }
     if (nameSet.size === 0) {
-      return { changedSymbols, callers: [], impactedEndpoints: [], degraded: false };
+      return {
+        changedSymbols,
+        callers: [],
+        impactedEndpoints: [],
+        degraded: partial,
+        reason: partial ? 'index_partial' : undefined,
+      };
     }
 
     // Resolved cross-file callers.
@@ -391,7 +406,8 @@ export class RepoIntelService implements RepoIntel {
       callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
       impactedEndpoints: [...endpoints],
       factsByFile,
-      degraded: false,
+      degraded: partial,
+      reason: partial ? 'index_partial' : undefined,
     };
   }
 
@@ -731,6 +747,18 @@ const JUNK_PATH_PATTERNS = [
   'eslint',
   'prettier',
 ] as const;
+
+/**
+ * Why `getBlastRadius` fell back to the ripgrep best-effort path. The flag
+ * takes priority over any persisted state (an operator turned repo-intel off
+ * on purpose), then a persisted `failed` index, then whatever degraded reason
+ * the index state carries, defaulting to `no_data` when there's no state at all.
+ */
+function fallbackBlastReason(repoIntelEnabled: boolean, state: IndexState | null): DegradedReason {
+  if (!repoIntelEnabled) return 'flag_off';
+  if (state?.status === 'failed') return 'index_failed';
+  return state?.degradedReason ?? 'no_data';
+}
 
 function isJunkPath(path: string): boolean {
   const lower = path.toLowerCase();

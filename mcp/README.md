@@ -42,8 +42,8 @@ npm run inspect      # MCP Inspector — see "Inspecting the server" below
 
 ## Tools
 
-Registered in this fixed order (pinned by `test/tools-list.test.ts`); `get_blast_radius` only
-exists when `DEVDIGEST_MCP_ENABLE_BLAST_RADIUS=1`, and is always last.
+Registered in this fixed order (pinned by `test/tools-list.test.ts`); `get_blast_radius` is
+always on and always last.
 
 | Tool | Input | Returns | Annotations |
 |---|---|---|---|
@@ -51,7 +51,7 @@ exists when `DEVDIGEST_MCP_ENABLE_BLAST_RADIUS=1`, and is always last.
 | `get_conventions` | `repo` (`owner/name`), `status` = `accepted`\|`pending`\|`all` (default `accepted`), `limit` (default 30, max 100), `response_format` = `concise`\|`detailed` | Extracted conventions for the repo, fenced as `<untrusted_data>` | RO · non-destructive · idempotent · closed-world |
 | `run_agent_on_pr` | `agentId` (uuid), `repo` (`owner/name`), `prNumber` | `{runId, status, reused, agentName, repo, prNumber, next}` — returns immediately with `status:"running"` | not RO · non-destructive · not idempotent · **open-world** |
 | `get_findings` | `runId`, `minSeverity?`, `limit` (default 20, max 50), `cursor?`, `response_format` | Status, cost, verdict, severity counts, a page of findings, `next_cursor`, `truncated`, `hint`. Fenced as `<untrusted_data>` | RO · non-destructive · idempotent · closed-world |
-| `get_blast_radius` *(flag only)* | `repo`, `prNumber` | Always `isError`: "not implemented yet; use get_findings" | RO · non-destructive · idempotent · closed-world |
+| `get_blast_radius` | `repo`, `prNumber` | `{repo, prNumber, summary, degraded, reason, changedSymbols[], downstream[{symbol, callers[], endpoints[], crons[]}], hint?}` — changed symbols and callers as flat strings, fenced as `<untrusted_data>` | RO · non-destructive · idempotent · closed-world |
 
 `run_agent_on_pr` is the one write. Everything else is read-only, which is why it's the only tool
 marked `openWorldHint: true` (it triggers a review, an external-cost side effect) — see the
@@ -79,7 +79,6 @@ Read only in `src/config.ts` — no other module touches `process.env` (package 
 | Var | Default | Meaning |
 |---|---|---|
 | `DEVDIGEST_API_URL` | `http://localhost:3001` | Base URL of the Fastify API. Must be `http:` or `https:`. |
-| `DEVDIGEST_MCP_ENABLE_BLAST_RADIUS` | unset | Set to `1` to register the `get_blast_radius` stub. |
 
 Request timeout is a fixed 15s (`REQUEST_TIMEOUT_MS` in `src/config.ts`).
 
@@ -94,10 +93,13 @@ malformed call (bad schema) becomes one. `src/api/errors.ts#ApiErrorKind` drives
 | API not running | `DevDigest API is not reachable at <url>. Start the API with ./scripts/dev.sh, then retry.` |
 | Repo not imported | `Repo "<owner>/<name>" is not imported. Imported repos: <list>.` (or "No repos are imported yet…") |
 | Agent/PR not found (`run_agent_on_pr`) | …plus `Call list_agents to check the agent id, or import this PR in DevDigest first.` |
+| PR not found (`get_blast_radius`) | `PR #<N> is not in DevDigest for <owner>/<name>.` plus `Open this PR in DevDigest once so its files are imported, then retry.` |
 | Rate limited | …plus `Wait a moment before retrying / starting another run.` |
 | `get_findings` while `status:"running"` | No error — `hint: "Run is still in progress — call get_findings again in ~15s."` |
 | `get_findings` after `status:"failed"` | `hint: "Run failed (<error>) — check the provider key and retry."` |
 | Response too large for one page | `hint: "…narrow with minSeverity or a smaller limit."`, `truncated: true` |
+| `get_blast_radius` degraded data | `hint: "…resync the repo in DevDigest to rebuild the index, then retry."` |
+| `get_blast_radius` zero changed symbols | `hint: "…open this PR in DevDigest once so its files are imported, then retry."` |
 
 PR/LLM-derived content (conventions, findings) is never trusted as instructions: it is wrapped in
 `<untrusted_data>…</untrusted_data>` by `src/format/untrusted.ts#wrapUntrustedJson`, and any literal
@@ -109,10 +111,10 @@ and `Repo.clone_path` are never returned by any tool.
 MCP tool descriptions get sent to the model on every session start, so `tools/list` has a hard
 budget, pinned by `test/tools-list.test.ts`:
 
-- `JSON.stringify(tools).length ≤ 7000` with the flag off — **measured 5813 chars (~1454 tokens at
-  chars/4)**; 6423 chars (~1606 tokens) with `DEVDIGEST_MCP_ENABLE_BLAST_RADIUS=1` (5 tools). The
-  budget was raised from an earlier 5000 because at 5000 every tool/param description had to be
-  stripped, trading real model accuracy for only ~300 tokens of savings (`mcp/INSIGHTS.md`).
+- `JSON.stringify(tools).length ≤ 8000` for all 5 tools (`get_blast_radius` is always registered,
+  no flag) — **measured 7313 chars (~1828 tokens at chars/4)**. The budget was raised from an
+  earlier 5000 (chars/4-token trade-off) to 7000, then to 8000 once `get_blast_radius` became a
+  real, always-on tool instead of an opt-in stub (`mcp/INSIGHTS.md`).
 - Every tool `description` is ≤300 chars, starts with a verb, and says what to call next.
 - Schemas are flat inline zod v3 shapes — no `$defs`/`$ref`; no `$schema` meta either (stripped by
   `src/tools/_register.ts#stripJsonSchemaMetaFromToolsList`, since the SDK always emits it and

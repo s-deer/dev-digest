@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HttpDevDigestApi } from '../src/api/http.js';
 import { ApiError } from '../src/api/errors.js';
-import { buildAgent, buildRepo, buildRunDetail, buildStartRunResponse } from './fakes.js';
+import {
+  buildAgent,
+  buildBlastRadiusResponse,
+  buildPrMeta,
+  buildRepo,
+  buildRunDetail,
+  buildStartRunResponse,
+} from './fakes.js';
 
-const config = { apiUrl: 'http://localhost:3001', enableBlastRadius: false, requestTimeoutMs: 15_000 };
+const config = { apiUrl: 'http://localhost:3001', requestTimeoutMs: 15_000 };
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -124,5 +131,29 @@ describe('HttpDevDigestApi', () => {
     const api = new HttpDevDigestApi(config);
     const err = await expectApiError(api.getRun('missing'), 'not_found');
     expect(err.message).toBe('Run not found');
+  });
+
+  it('parses a valid pulls list', async () => {
+    const pr = buildPrMeta();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, [pr])));
+    const api = new HttpDevDigestApi(config);
+    await expect(api.listPulls('repo-1')).resolves.toEqual([pr]);
+  });
+
+  it('parses a valid blast radius response', async () => {
+    const blast = buildBlastRadiusResponse();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, blast)));
+    const api = new HttpDevDigestApi(config);
+    await expect(api.getBlastRadius('pr-1')).resolves.toEqual(blast);
+  });
+
+  it('maps a missing blast radius (404) to kind "not_found"', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(404, { error: { code: 'not_found', message: 'Pull request not found' } })),
+    );
+    const api = new HttpDevDigestApi(config);
+    const err = await expectApiError(api.getBlastRadius('missing'), 'not_found');
+    expect(err.message).toBe('Pull request not found');
   });
 });

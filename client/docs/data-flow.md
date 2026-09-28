@@ -34,6 +34,7 @@ page.tsx / _components   →   src/lib/hooks/*.ts   →   src/lib/api.ts   →  
 | Trace drawer stats, prompt, log | `useRunTrace` (`hooks/trace.ts:12`) | `["run-trace", runId]` | `GET /runs/:id/trace` | — |
 | Trace drawer **findings** | *no fetch*: taken from `usePrReviews` data | — | — | — |
 | Overview **Intent** card | `usePrIntent` (`hooks/intent.ts:12`) | `["pr-intent", prId]` | `GET /pulls/:id/intent` | on invalidation |
+| Overview **Blast radius** card | `usePrBlast` (`hooks/blast.ts:14`) | `["pr-blast", prId]` | `GET /pulls/:id/blast` | on remount only (no mutation invalidates it yet) |
 | Files changed → **Smart order** groups, counters, file dots | `useSmartDiff` (`hooks/smart-diff.ts:17`) | `["pr-smart-diff", prId]` | `GET /pulls/:id/smart-diff` | on invalidation; enabled only once `usePullDetail`'s files have loaded (see [`../../server/docs/smart-diff.md`](../../server/docs/smart-diff.md)) |
 
 The tab is in the URL: `?tab=findings` is the tab labelled **"Agent runs"**
