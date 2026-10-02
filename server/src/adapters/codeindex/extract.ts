@@ -195,7 +195,7 @@ export function extractEndpoints(content: string): string[] {
 }
 
 /**
- * Heuristic cron/scheduled-job detector. Catches cron expressions in
+ * Heuristic cron/scheduled-job detector (regex-only, no AST). Catches cron expressions in
  * `schedule('* * * * *')`, `cron.schedule(...)`, `CronJob(...)`, and
  * `jobs.register('kind')` / `enqueue(ws, 'kind')` style background work.
  */
