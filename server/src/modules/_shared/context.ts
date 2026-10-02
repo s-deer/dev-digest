@@ -4,6 +4,8 @@ import type { Container } from '../../platform/container.js';
 export interface RequestContext {
   workspaceId: string;
   userId: string;
+  /** Fastify request id — lets downstream logs correlate with the request. */
+  requestId: string;
 }
 
 /**
@@ -19,5 +21,5 @@ export async function getContext(
     container.auth.currentUser(req),
     container.auth.currentWorkspace(req),
   ]);
-  return { workspaceId: workspace.id, userId: user.id };
+  return { workspaceId: workspace.id, userId: user.id, requestId: req.id };
 }
