@@ -20,7 +20,7 @@ import { dirname, join } from 'node:path';
 const PROMPTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'prompts');
 const cache = new Map<string, string>();
 
-/** Read a raw template file (e.g. "onboarding.system.md"), cached. */
+/** Read a raw template file (e.g. "onboarding.system.md"), cached for the life of the process. */
 export async function loadPromptTemplate(name: string): Promise<string> {
   const cached = cache.get(name);
   if (cached !== undefined) return cached;
