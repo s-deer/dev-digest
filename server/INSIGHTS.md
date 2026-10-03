@@ -33,6 +33,12 @@ re-discovered the hard way.
 - **Do:** ALWAYS fold rows through `summarizeFindings` (`modules/reviews/findings-summary.ts`). NEVER add severity-count columns to `agent_runs` for display.
 - **Evidence:** `server/src/modules/reviews/repository/run.repo.ts:57`, `server/src/modules/pulls/routes.ts:145`, test "findings breakdown on runs + PR list" in `server/test/reviews.it.test.ts`
 
+### 2026-10-03 · Same-file caller exclusion lives only in the repo-intel facade, so blast consumers must not re-filter
+- **Context:** `RepoIntel.getBlastRadius` → `blast/domain.ts#toBlastRadius` (and any future consumer of `BlastResult.callers`).
+- **Insight:** Both facade paths already guarantee that no caller sits in the changed symbol's declaring file. The ripgrep fallback skips `r.fromPath === sym.file`. The persistent path's `decl_file` is set only through an import edge (`resolveReferences`), so it is never the caller's own file. A consumer-side copy keyed on symbol name diverges when two changed symbols share a name, and a reviewer flagged it as duplicated logic.
+- **Do:** NEVER re-filter declaring-file callers downstream. Fix the facade instead, where the guarantee is pinned by a test.
+- **Evidence:** `server/src/modules/repo-intel/service.ts:284`, `server/src/modules/repo-intel/repository.ts:408`, test "getBlastRadius ripgrep fallback excludes references from the symbol's declaring file" in `server/test/repo-intel-facade-degraded.test.ts`.
+
 ## Gotchas & recurring errors
 
 ### 2026-09-15 · The server and client copies of `@devdigest/shared` have already drifted apart

@@ -60,3 +60,15 @@ re-discovered the hard way.
 - **Insight:** When the file has no findings, `?? []` allocates a brand-new empty array literal on every render, so the `useMemo`'s dependency array never looks equal to the previous render's — it recomputes on every render even though "no findings" never changes.
 - **Do:** Give the "empty" case a single module-level constant (`const EMPTY: T[] = []`) and use that instead of an inline `?? []`, so the reference is stable across renders and the memo actually short-circuits.
 - **Evidence:** `client/src/components/diff-viewer/FileCard/FileCard.tsx` (`EMPTY`).
+
+### 2026-09-28 · RTL's default `getByText` can't see "N label" when the count is wrapped in its own element
+- **Context:** `BlastStats` renders each stat as `<span><Icon/><strong>{count}</strong> {label}</span>`; `screen.getByText("2 symbols")` failed with "text is broken up by multiple elements".
+- **Insight:** RTL's default text matcher (`getNodeText`) only concatenates a node's *direct* text-node children, skipping any text inside child elements. Wrapping the count in `<strong>` moves it one level too deep, so the parent `<span>`'s matched text is just the label (`"symbols"`), never `"2 symbols"` — no amount of JSX whitespace tweaking fixes this, since the gap is structural, not whitespace.
+- **Do:** For a mixed text+element row you must assert as one string, use a custom matcher that reads `element.textContent` directly: `screen.getByText((_, el) => el?.textContent?.replace(/\s+/g, " ").trim() === "2 symbols")`.
+- **Evidence:** `client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/_components/BlastStats/BlastStats.tsx`, `BlastRadiusCard.test.tsx` (`fullText` helper).
+
+### 2026-09-28 · RTL's `getByText` sees an SVG `<title>` tooltip and its sibling `<text>` label as two separate matches
+- **Context:** `BlastGraph` renders each node as `<g><title>{label}</title><rect/><text>{label}</text></g>` — the `<title>` gives a native hover tooltip for a truncated label, the `<text>` is the visible box label.
+- **Insight:** Both elements' text content equal the same string, so `screen.getByText(label)` throws "multiple elements found" even though only one of them is the visually rendered label the test cares about (the one a caller-link `<a>` wraps).
+- **Do:** Scope the query to the visible element with `screen.getByText(label, { selector: "text" })` (SVG tag name, lowercase) instead of a bare `getByText`.
+- **Evidence:** `client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/_components/BlastGraph/BlastGraph.test.tsx`, `BlastRadiusCard.test.tsx` (graph-toggle test).

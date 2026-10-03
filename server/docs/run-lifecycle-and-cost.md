@@ -42,6 +42,19 @@ stateDiagram-v2
    `cancelled`, the error text and the log so far are saved as the trace, and
    `costUsd` is written as `null`.
 
+### Addressing a run via repo + PR number (MCP)
+
+`POST /runs` starts (or reuses) a run for **one** agent on a PR addressed by
+`repo_id` + its GitHub PR number, instead of the pull's internal uuid — the
+entry point the DevDigest MCP server's `run_agent_on_pr` tool calls, since it
+only knows `owner/name` + number. `StartRunUseCase`
+(`src/modules/reviews/start-run.ts`) does the PR/agent lookup and the
+same-agent-same-PR dedupe: an existing `running` row for that pair returns
+`reused: true` instead of starting a second run (no unique index — a rare
+concurrent double-POST can still race). `GET /runs/:id` (`RunDetail`) is the
+read side — status, cost, and once a review was persisted, its verdict/score/
+findings — used by the MCP `get_findings` tool.
+
 ### Live events and cancellation
 
 - Events go through the in-memory `RunBus` (`src/platform/sse.ts:19`).

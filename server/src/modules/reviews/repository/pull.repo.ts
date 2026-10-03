@@ -17,6 +17,30 @@ export async function getPull(
   return row;
 }
 
+/**
+ * Resolve a PR by its GitHub number within a repo (workspace-scoped) — used
+ * by `StartRunUseCase` to address a PR as (repo, number) instead of its
+ * internal uuid, since the MCP `run_agent_on_pr` tool only knows those.
+ */
+export async function getPullByNumber(
+  db: Db,
+  workspaceId: string,
+  repoId: string,
+  number: number,
+): Promise<PullRow | undefined> {
+  const [row] = await db
+    .select()
+    .from(t.pullRequests)
+    .where(
+      and(
+        eq(t.pullRequests.workspaceId, workspaceId),
+        eq(t.pullRequests.repoId, repoId),
+        eq(t.pullRequests.number, number),
+      ),
+    );
+  return row;
+}
+
 export async function getRepo(
   db: Db,
   repoId: string,

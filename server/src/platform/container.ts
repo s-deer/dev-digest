@@ -31,6 +31,8 @@ import { IntentRepository } from '../modules/intent/repository.js';
 import { IntentService } from '../modules/intent/service.js';
 import { SmartDiffRepository } from '../modules/smart-diff/repository.js';
 import { SmartDiffService } from '../modules/smart-diff/service.js';
+import { BlastRepository } from '../modules/blast/repository.js';
+import { BlastService } from '../modules/blast/service.js';
 import { resolveFeatureModel } from '../modules/settings/feature-models.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
@@ -85,6 +87,8 @@ export class Container {
   private _intentService?: IntentService;
   private _smartDiffRepo?: SmartDiffRepository;
   private _smartDiffService?: SmartDiffService;
+  private _blastRepo?: BlastRepository;
+  private _blastService?: BlastService;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -143,6 +147,15 @@ export class Container {
   /** SmartDiffService (L03) — narrow deps, no `Container` (see onion-architecture). */
   get smartDiffService(): SmartDiffService {
     return (this._smartDiffService ??= new SmartDiffService({ source: this.smartDiffRepo }));
+  }
+
+  get blastRepo(): BlastRepository {
+    return (this._blastRepo ??= new BlastRepository(this.db));
+  }
+
+  /** BlastService (L04) — narrow deps, no `Container` (see onion-architecture). */
+  get blastService(): BlastService {
+    return (this._blastService ??= new BlastService({ source: this.blastRepo, repoIntel: this.repoIntel }));
   }
 
   get codeIndex(): CodeIndex {

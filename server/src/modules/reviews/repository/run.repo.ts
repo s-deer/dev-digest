@@ -1,9 +1,91 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../../../db/client.js';
 import * as t from '../../../db/schema.js';
-import type { RunSummary, RunTrace } from '@devdigest/shared';
+import type { RunDetail, RunSummary, RunTrace, Verdict } from '@devdigest/shared';
 import { emptyFindingsSummary, summarizeFindings } from '../findings-summary.js';
+import { findingRowToDto, toRunStatus } from '../helpers.js';
 import { findingSummaryColumns } from './review.repo.js';
+
+/**
+ * Existing in-flight run for the same agent + PR, if any — used by
+ * `StartRunUseCase` to dedupe. Checks the DB `running` row, not `runBus`
+ * (see server/INSIGHTS.md — SSE completion is not background-runner
+ * liveness).
+ */
+export async function findRunningRun(
+  db: Db,
+  workspaceId: string,
+  prId: string,
+  agentId: string,
+): Promise<{ run_id: string } | undefined> {
+  const [row] = await db
+    .select({ id: t.agentRuns.id })
+    .from(t.agentRuns)
+    .where(
+      and(
+        eq(t.agentRuns.workspaceId, workspaceId),
+        eq(t.agentRuns.prId, prId),
+        eq(t.agentRuns.agentId, agentId),
+        eq(t.agentRuns.status, 'running'),
+      ),
+    );
+  return row ? { run_id: row.id } : undefined;
+}
+
+/**
+ * Full detail for one run: status, cost, and — once a review was persisted
+ * for it (`reviews.run_id`, `kind='review'`) — the review outcome and its
+ * findings. Scoped by workspace via the run row.
+ */
+export async function getRunDetail(
+  db: Db,
+  workspaceId: string,
+  runId: string,
+): Promise<RunDetail | undefined> {
+  const [row] = await db
+    .select({
+      run: t.agentRuns,
+      agentName: t.agents.name,
+      prNumber: t.pullRequests.number,
+      repoFullName: t.repos.fullName,
+    })
+    .from(t.agentRuns)
+    .leftJoin(t.agents, eq(t.agents.id, t.agentRuns.agentId))
+    .innerJoin(t.pullRequests, eq(t.pullRequests.id, t.agentRuns.prId))
+    .innerJoin(t.repos, eq(t.repos.id, t.pullRequests.repoId))
+    .where(and(eq(t.agentRuns.workspaceId, workspaceId), eq(t.agentRuns.id, runId)));
+  if (!row) return undefined;
+
+  const [review] = await db
+    .select()
+    .from(t.reviews)
+    .where(and(eq(t.reviews.runId, runId), eq(t.reviews.kind, 'review')));
+  const findings = review
+    ? await db.select().from(t.findings).where(eq(t.findings.reviewId, review.id))
+    : [];
+
+  const { run } = row;
+  return {
+    run_id: run.id,
+    status: toRunStatus(run.status),
+    error: run.error,
+    agent_id: run.agentId,
+    agent_name: row.agentName ?? null,
+    provider: run.provider,
+    model: run.model,
+    // The inner join on pullRequests above guarantees this is set.
+    pr_id: run.prId!,
+    pr_number: row.prNumber,
+    repo_full_name: row.repoFullName,
+    ran_at: run.ranAt ? run.ranAt.toISOString() : null,
+    duration_ms: run.durationMs,
+    cost_usd: run.costUsd == null ? null : Number(run.costUsd),
+    score: review?.score ?? null,
+    verdict: (review?.verdict as Verdict | null) ?? null,
+    summary: review?.summary ?? null,
+    findings: findings.map(findingRowToDto),
+  };
+}
 
 // ---- in-flight / history --------------------------------------------------
 

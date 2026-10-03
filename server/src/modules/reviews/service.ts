@@ -1,10 +1,11 @@
 import type { Container } from '../../platform/container.js';
-import type { FindingActionKind, RunEventKind, RunTrace } from '@devdigest/shared';
+import type { FindingActionKind, RunDetail, RunEventKind, RunTrace, StartRunResponse } from '@devdigest/shared';
 import { AppError, NotFoundError } from '../../platform/errors.js';
 import type { AgentRow } from '../../db/rows.js';
 import { ReviewRepository } from './repository.js';
 import { type ReviewDto, type ReviewDtoFinding } from './helpers.js';
 import { ReviewRunExecutor, type Logger } from './run-executor.js';
+import { StartRunUseCase } from './start-run.js';
 import { actOnFinding as actOnFindingImpl } from './findings.js';
 import { reviewToDto } from './helpers.js';
 
@@ -29,11 +30,22 @@ export class ReviewService {
   private repo: ReviewRepository;
   private agents: Container['agentsRepo'];
   private executor: ReviewRunExecutor;
+  private startRunUseCase: StartRunUseCase<AgentRow>;
 
+  // Known deviation (see .claude/skills/onion-architecture): ReviewService
+  // takes the whole Container and builds its own repositories. Not deepened
+  // here — StartRunUseCase itself only sees the narrow StartRunDeps wired
+  // below, so its dedupe/lookup logic stays hermetically testable.
   constructor(private container: Container) {
     this.repo = new ReviewRepository(container.db);
     this.agents = container.agentsRepo;
     this.executor = new ReviewRunExecutor(container, this.repo, this.agents, container.intentService);
+    this.startRunUseCase = new StartRunUseCase<AgentRow>({
+      pulls: { getPullByNumber: (ws, repoId, n) => this.repo.getPullByNumber(ws, repoId, n) },
+      runs: { findRunningRun: (ws, prId, agentId) => this.repo.findRunningRun(ws, prId, agentId) },
+      agents: { getById: (ws, id) => this.agents.getById(ws, id) },
+      launch: (ws, prId, agent) => this.runReview(ws, prId, [agent]).then((r) => r.runs[0]!),
+    });
   }
 
   // ===========================================================================
@@ -181,5 +193,23 @@ export class ReviewService {
 
   async getRunTrace(workspaceId: string, runId: string): Promise<RunTrace | undefined> {
     return this.repo.getRunTrace(workspaceId, runId);
+  }
+
+  /**
+   * Start (or reuse) a run for one agent on a PR addressed by repo + PR
+   * number — the MCP `run_agent_on_pr` entry point. See `StartRunUseCase`.
+   */
+  async startRun(
+    workspaceId: string,
+    input: { repoId: string; prNumber: number; agentId: string },
+  ): Promise<StartRunResponse> {
+    return this.startRunUseCase.execute(workspaceId, input);
+  }
+
+  /** Status + cost + (once done) review outcome + findings for one run. */
+  async getRunDetail(workspaceId: string, runId: string): Promise<RunDetail> {
+    const detail = await this.repo.getRunDetail(workspaceId, runId);
+    if (!detail) throw new NotFoundError('Run not found');
+    return detail;
   }
 }

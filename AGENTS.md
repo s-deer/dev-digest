@@ -35,6 +35,7 @@ Drizzle ORM + Postgres (pgvector) · Zod · Vitest · agent-browser (e2e)
 | Migrations      | `cd server && pnpm db:generate` then `pnpm db:migrate`    |
 | Client          | `cd client && pnpm dev \| build \| typecheck \| test`     |
 | Engine          | `cd reviewer-core && npm test \| npm run typecheck`       |
+| MCP server      | `cd mcp && npm test \| npm run typecheck \| npm start`     |
 | E2E (hermetic)  | `cd e2e && npm run e2e:hermetic`                           |
 
 Flags for `dev.sh`: `--no-seed` · `--no-client` · `--db-only` · `--help`.
@@ -46,6 +47,7 @@ Flags for `dev.sh`: `--no-seed` · `--no-client` · `--db-only` · `--help`.
 | `server/`                   | Fastify API + Drizzle. Indexer at `src/modules/repo-intel/` |
 | `client/`                   | Next.js studio, App Router                                  |
 | `reviewer-core/`            | Pure engine: diff + repo map → prompt → LLM → findings      |
+| `mcp/`                      | Local stdio MCP server for Claude Code — thin adapter over the API |
 | `e2e/`                      | Deterministic browser flows, no LLM                         |
 | `server/src/vendor/shared/` | `@devdigest/shared` — Zod contracts for every package        |
 | `client/src/vendor/ui/`     | `@devdigest/ui` — vendored UI primitives                     |
@@ -53,8 +55,8 @@ Flags for `dev.sh`: `--no-seed` · `--no-client` · `--db-only` · `--help`.
 ## Conventions (non-default — you cannot infer these from the code)
 
 - **Not a monorepo workspace.** Each package has its own `package.json` and its
-  own lockfile. `server/` + `client/` use **pnpm**; `reviewer-core/` + `e2e/`
-  use **npm**. Never run the wrong package manager in a package. (The
+  own lockfile. `server/` + `client/` use **pnpm**; `reviewer-core/` + `e2e/` +
+  `mcp/` use **npm**. Never run the wrong package manager in a package. (The
   `pnpm-workspace.yaml` in `client/` and `server/` only sets `pnpm.allowBuilds`
   for native deps — it is not a real workspace root.)
 - Cross-package imports resolve through **tsconfig path aliases**, not
@@ -72,7 +74,7 @@ Flags for `dev.sh`: `--no-seed` · `--no-client` · `--db-only` · `--help`.
 - Packages are npm-scoped `@devdigest/<name>`, and the scope name does not
   always match the folder: `server/` → `@devdigest/api`, `client/` →
   `@devdigest/web`, `reviewer-core/` → `@devdigest/reviewer-core`, `e2e/` →
-  `@devdigest/e2e`.
+  `@devdigest/e2e`, `mcp/` → `@devdigest/mcp`.
 - Server test files: `*.it.test.ts` means DB-backed (testcontainers). Any
   other `*.test.ts` must stay hermetic — don't add DB access to it.
 - `src/vendor/<name>` mirrors the scoped package it vendors:
@@ -111,4 +113,6 @@ Flags for `dev.sh`: `--no-seed` · `--no-client` · `--db-only` · `--help`.
 - Read `client/README.md` when adding a page or a data hook.
 - Read `reviewer-core/README.md` when touching prompt assembly, structured
   output, or the grounding gate.
+- Read `mcp/README.md` when adding or changing an MCP tool, its schema, or the
+  `tools/list` token budget.
 - Read `e2e/README.md` before writing or debugging a browser flow.

@@ -2,7 +2,7 @@
  * Pure helpers for the review service (side-effect free; operate purely on
  * their arguments — no DB / network / `this`).
  */
-import type { Finding } from '@devdigest/shared';
+import type { Finding, RunStatus } from '@devdigest/shared';
 import type { FindingRow, PullRow, ReviewRow } from './repository.js';
 
 // reduceReviews + sliceDiff live in @devdigest/reviewer-core (pure engine logic
@@ -79,6 +79,17 @@ export function reviewToDto(
     created_at: review.createdAt.toISOString(),
     findings: findings.map(findingRowToDto),
   };
+}
+
+const RUN_STATUSES: ReadonlySet<string> = new Set<RunStatus>(['running', 'done', 'failed', 'cancelled']);
+
+/**
+ * Narrows the free-text `agent_runs.status` column to the `RunStatus` union,
+ * falling back to `'failed'` for `null` or any value this server version
+ * doesn't recognize.
+ */
+export function toRunStatus(raw: string | null): RunStatus {
+  return raw != null && RUN_STATUSES.has(raw) ? (raw as RunStatus) : 'failed';
 }
 
 /**
