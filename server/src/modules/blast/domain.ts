@@ -24,16 +24,17 @@ export interface BlastCounts {
 /**
  * Build the `BlastRadiusResponse` from the facade's result.
  *   1. `changed_symbols` = the facade's changed symbols, remapped field order.
- *   2. Drop callers located in the symbol's own declaring file (defensive
- *      guard — the facade already filters this, but don't trust it twice).
- *   3. Group the remaining callers by `viaSymbol`; per group dedupe on
- *      `file|line|symbol`, sort by rank desc / file / line, and cap at
- *      `maxCallersPerSymbol`.
- *   4. Per group, `endpoints_affected`/`crons_affected` are sorted unique
+ *   2. Group callers by `viaSymbol`; per group dedupe on `file|line|symbol`,
+ *      sort by rank desc / file / line, and cap at `maxCallersPerSymbol`.
+ *      (The repo-intel facade guarantees callers are never in the symbol's
+ *      declaring file: the ripgrep fallback skips `r.fromPath === sym.file` in
+ *      `repo-intel/service.ts`; the persistent path resolves `decl_file` only
+ *      via an import edge in `repository.ts#resolveReferences`.)
+ *   3. Per group, `endpoints_affected`/`crons_affected` are sorted unique
  *      unions from `factsByFile` over that group's (capped) caller files.
- *   5. Groups are ordered by their max caller rank, desc.
- *   6. `summary` is a deterministic string from `summarizeBlast`.
- *   7. `degraded`/`reason` pass through from the facade result.
+ *   4. Groups are ordered by their max caller rank, desc.
+ *   5. `summary` is a deterministic string from `summarizeBlast`.
+ *   6. `degraded`/`reason` pass through from the facade result.
  */
 export function toBlastRadius(
   result: BlastResult,
@@ -45,11 +46,8 @@ export function toBlastRadius(
     kind: s.kind,
   }));
 
-  const declaringFileByName = new Map(result.changedSymbols.map((s) => [s.name, s.file]));
-  const callers = result.callers.filter((c) => declaringFileByName.get(c.viaSymbol) !== c.file);
-
   const bySymbol = new Map<string, BlastCallerRow[]>();
-  for (const c of callers) {
+  for (const c of result.callers) {
     const group = bySymbol.get(c.viaSymbol);
     if (group) group.push(c);
     else bySymbol.set(c.viaSymbol, [c]);

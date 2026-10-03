@@ -45,7 +45,7 @@ const EXTRA_HINTS: Partial<Record<ApiErrorKind, string[]>> = {
   rate_limited: ['Wait a moment before starting another run.'],
 };
 
-const NEXT_HINT = 'Call get_findings with this runId to check progress and read results.';
+const NEXT_HINT = 'Call get_findings with this repo and prNumber to check progress and read results.';
 
 export function registerRunAgentOnPrTool(server: McpServer, api: DevDigestApi): void {
   registerTool(
@@ -54,7 +54,7 @@ export function registerRunAgentOnPrTool(server: McpServer, api: DevDigestApi): 
     {
       description:
         'Start a review of a PR with one agent; returns runId immediately (status running). ' +
-        'Reuses an already-running run. Poll get_findings(runId) for results.',
+        'Reuses an already-running run. Poll get_findings(repo, prNumber) for results.',
       inputSchema: InputSchema,
       outputSchema: OutputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },

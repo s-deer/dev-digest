@@ -47,10 +47,10 @@ always on and always last.
 
 | Tool | Input | Returns | Annotations |
 |---|---|---|---|
-| `list_agents` | *(none)* | `{agents: [{id, name, description≤200, provider, model, enabled, skillCount}]}` | RO · non-destructive · idempotent · closed-world |
+| `list_agents` | *(none)* | `{agents: [{id, name, description≤200, model, enabled, skillCount}]}` | RO · non-destructive · idempotent · closed-world |
 | `get_conventions` | `repo` (`owner/name`), `status` = `accepted`\|`pending`\|`all` (default `accepted`), `limit` (default 30, max 100), `response_format` = `concise`\|`detailed` | Extracted conventions for the repo, fenced as `<untrusted_data>` | RO · non-destructive · idempotent · closed-world |
 | `run_agent_on_pr` | `agentId` (uuid), `repo` (`owner/name`), `prNumber` | `{runId, status, reused, agentName, repo, prNumber, next}` — returns immediately with `status:"running"` | not RO · non-destructive · not idempotent · **open-world** |
-| `get_findings` | `runId`, `minSeverity?`, `limit` (default 20, max 50), `cursor?`, `response_format` | Status, cost, verdict, severity counts, a page of findings, `next_cursor`, `truncated`, `hint`. Fenced as `<untrusted_data>` | RO · non-destructive · idempotent · closed-world |
+| `get_findings` | `repo` (`owner/name`), `prNumber`, `minSeverity?`, `limit` (per review; default 20, max 50), `response_format` | PR-level: the latest review per agent (`verdict`, `score`, `cost_usd`, `total_findings`, `findings`, `truncated`), top-level `total_findings`/`counts` (summed), `in_progress[]`, `failed[]`, `hint`. Fenced as `<untrusted_data>` | RO · non-destructive · idempotent · closed-world |
 | `get_blast_radius` | `repo`, `prNumber` | `{repo, prNumber, summary, degraded, reason, changedSymbols[], downstream[{symbol, callers[], endpoints[], crons[]}], hint?}` — changed symbols and callers as flat strings, fenced as `<untrusted_data>` | RO · non-destructive · idempotent · closed-world |
 
 `run_agent_on_pr` is the one write. Everything else is read-only, which is why it's the only tool
@@ -62,7 +62,7 @@ annotation matrix asserted in `test/tools-list.test.ts`.
 ```
 list_agents                              # pick an agentId
   → run_agent_on_pr "<owner>/<repo>" #N   # returns {runId, status:"running", reused}
-    → get_findings(runId)                # poll every ~15s while status is "running"
+    → get_findings "<owner>/<repo>" #N   # poll every ~15s while in_progress is non-empty
 ```
 
 A second `run_agent_on_pr` call for the same agent + PR while a run is still `running` returns
@@ -95,8 +95,10 @@ malformed call (bad schema) becomes one. `src/api/errors.ts#ApiErrorKind` drives
 | Agent/PR not found (`run_agent_on_pr`) | …plus `Call list_agents to check the agent id, or import this PR in DevDigest first.` |
 | PR not found (`get_blast_radius`) | `PR #<N> is not in DevDigest for <owner>/<name>.` plus `Open this PR in DevDigest once so its files are imported, then retry.` |
 | Rate limited | …plus `Wait a moment before retrying / starting another run.` |
-| `get_findings` while `status:"running"` | No error — `hint: "Run is still in progress — call get_findings again in ~15s."` |
-| `get_findings` after `status:"failed"` | `hint: "Run failed (<error>) — check the provider key and retry."` |
+| `get_findings` with runs still going | No error — `in_progress: [{agent_name}]`, `hint: "N run(s) still in progress — call get_findings again in ~15s."` |
+| `get_findings` after a failed run (no newer review) | `failed: [{agent_name, error}]`, `hint: "Run failed (<error>) — check the provider key and retry."` |
+| `get_findings` on a PR with no reviews | `hint: "No reviews yet — start one with run_agent_on_pr."` |
+| PR not found (`get_findings`) | Same message and hint as `get_blast_radius` |
 | Response too large for one page | `hint: "…narrow with minSeverity or a smaller limit."`, `truncated: true` |
 | `get_blast_radius` degraded data | `hint: "…resync the repo in DevDigest to rebuild the index, then retry."` |
 | `get_blast_radius` zero changed symbols | `hint: "…open this PR in DevDigest once so its files are imported, then retry."` |
@@ -119,8 +121,8 @@ budget, pinned by `test/tools-list.test.ts`:
 - Schemas are flat inline zod v3 shapes — no `$defs`/`$ref`; no `$schema` meta either (stripped by
   `src/tools/_register.ts#stripJsonSchemaMetaFromToolsList`, since the SDK always emits it and
   `zod-to-json-schema` has no option to suppress it — see `mcp/INSIGHTS.md`).
-- No tool has a `title`; only the key params (`repo`, `agentId`, `runId`, `prNumber`, `minSeverity`,
-  `cursor`, `response_format`) carry a short `.describe()`.
+- No tool has a `title`; only the key params (`repo`, `agentId`, `prNumber`, `minSeverity`,
+  `response_format`) carry a short `.describe()`.
 - A no-param tool (`list_agents`) reports `{type:"object", additionalProperties:false}`.
 - Server `instructions` (the one place the end-to-end flow is spelled out) stays ≤600 chars.
 - Tool names are snake_case with no `devdigest_` prefix (the server name is already the namespace).
@@ -130,8 +132,8 @@ budget, pinned by `test/tools-list.test.ts`:
 - **Five separate tools, no facade tool.** A single dispatch tool (`devdigest(action, …)`) pays off
   for many *homogeneous* actions with the same shape; these five differ in input, side effects, and
   annotations (four read-only, one open-world write). Consolidation happens *inside* tools instead —
-  `get_findings` folds status + cost + verdict + findings into one call, with options as params
-  (`response_format`, `minSeverity`, `limit`, `cursor`). **Revisit trigger:** more than ~8 tools, or
+  `get_findings` folds every agent's verdict + score + findings for a PR (plus in-progress/failed runs) into one call, with options as params
+  (`response_format`, `minSeverity`, `limit`). **Revisit trigger:** more than ~8 tools, or
   several homogeneous repo-intel reads that would suit one parameterized tool.
 - **No MCP resources in v1.** Severity meaning is one `.describe()` on `findings[].severity`
   (`'CRITICAL > WARNING > SUGGESTION'`); the end-to-end flow lives in the server `instructions`

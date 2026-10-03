@@ -6,7 +6,8 @@ import {
   buildBlastRadiusResponse,
   buildPrMeta,
   buildRepo,
-  buildRunDetail,
+  buildReviewRecord,
+  buildRunSummary,
   buildStartRunResponse,
 } from './fakes.js';
 
@@ -116,21 +117,32 @@ describe('HttpDevDigestApi', () => {
     expect(JSON.parse(init.body as string)).toEqual({ repo_id: 'repo-1', pr_number: 482, agent_id: 'agent-1' });
   });
 
-  it('getRun parses a valid RunDetail', async () => {
-    const detail = buildRunDetail();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, detail)));
+  it('listPullReviews / listPullRuns parse valid arrays from /pulls/:id/*', async () => {
+    const review = buildReviewRecord();
+    const run = buildRunSummary();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, [review]))
+      .mockResolvedValueOnce(jsonResponse(200, [run]));
+    vi.stubGlobal('fetch', fetchMock);
     const api = new HttpDevDigestApi(config);
-    await expect(api.getRun('run-1')).resolves.toEqual(detail);
+
+    await expect(api.listPullReviews('pr-1')).resolves.toEqual([review]);
+    await expect(api.listPullRuns('pr-1')).resolves.toEqual([run]);
+    expect(fetchMock.mock.calls.map((c) => c[0])).toEqual([
+      'http://localhost:3001/pulls/pr-1/reviews',
+      'http://localhost:3001/pulls/pr-1/runs',
+    ]);
   });
 
-  it('maps a missing run (404) to kind "not_found"', async () => {
+  it('maps a missing PR (404) to kind "not_found"', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse(404, { error: { code: 'not_found', message: 'Run not found' } })),
+      vi.fn().mockResolvedValue(jsonResponse(404, { error: { code: 'not_found', message: 'PR not found' } })),
     );
     const api = new HttpDevDigestApi(config);
-    const err = await expectApiError(api.getRun('missing'), 'not_found');
-    expect(err.message).toBe('Run not found');
+    const err = await expectApiError(api.listPullReviews('missing'), 'not_found');
+    expect(err.message).toBe('PR not found');
   });
 
   it('parses a valid pulls list', async () => {

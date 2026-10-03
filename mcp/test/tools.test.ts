@@ -10,19 +10,17 @@ import {
   buildFinding,
   buildPrMeta,
   buildRepo,
-  buildRunDetail,
+  buildReviewRecord,
+  buildRunSummary,
   buildStartRunResponse,
   FakeDevDigestApi,
 } from './fakes.js';
 
 const config = { apiUrl: 'http://localhost:3001', requestTimeoutMs: 15_000 };
 
-// `agentId`/`runId` are validated as uuids by the tool input schemas.
+// `agentId` is validated as uuids by the tool input schemas.
 const AGENT_ID = '11111111-1111-1111-1111-111111111111';
-const RUN_1 = '22222222-2222-2222-2222-222222222222';
 const RUN_RUNNING = '33333333-3333-3333-3333-333333333333';
-const RUN_FAILED = '44444444-4444-4444-4444-444444444444';
-const RUN_MISSING = '55555555-5555-5555-5555-555555555555';
 
 async function connectedClient(api: FakeDevDigestApi): Promise<{ client: Client; server: McpServer }> {
   const server = createServer({ api, config });
@@ -69,7 +67,6 @@ describe('devdigest mcp tools', () => {
             id: 'a1',
             name: 'Reviewer',
             description: 'Reviews pull requests',
-            provider: 'openai',
             model: 'gpt-5',
             enabled: true,
             skillCount: 0,
@@ -188,7 +185,7 @@ describe('devdigest mcp tools', () => {
         agentName: 'Reviewer',
         repo: 'acme/payments-api',
         prNumber: 482,
-        next: 'Call get_findings with this runId to check progress and read results.',
+        next: 'Call get_findings with this repo and prNumber to check progress and read results.',
       });
     });
 
@@ -243,78 +240,86 @@ describe('devdigest mcp tools', () => {
   });
 
   describe('get_findings', () => {
-    it('returns status/cost/verdict/counts/findings, fenced as untrusted', async () => {
-      api.runsById.set(
-        RUN_1,
-        buildRunDetail({
-          run_id: RUN_1,
+    function seedPr(): void {
+      api.repos = [buildRepo({ id: 'r1', full_name: 'acme/payments-api' })];
+      api.pullsByRepoId.set('r1', [buildPrMeta({ id: 'pr-1', number: 482 })]);
+    }
+    const call = (args: Record<string, unknown> = {}) =>
+      client.callTool({ name: 'get_findings', arguments: { repo: 'acme/payments-api', prNumber: 482, ...args } });
+
+    it('returns per-agent reviews with nested findings and totals, fenced as untrusted', async () => {
+      seedPr();
+      api.reviewsByPrId.set('pr-1', [
+        buildReviewRecord({
+          agent_id: 'a1',
+          agent_name: 'Security',
+          run_id: 'run-a1',
           findings: [buildFinding({ id: 'f1', severity: 'CRITICAL' }), buildFinding({ id: 'f2', severity: 'WARNING' })],
         }),
-      );
+        buildReviewRecord({
+          agent_id: 'a2',
+          agent_name: 'Style',
+          run_id: 'run-a2',
+          findings: [buildFinding({ id: 'f3', severity: 'SUGGESTION' })],
+        }),
+      ]);
 
-      const result = await client.callTool({ name: 'get_findings', arguments: { runId: RUN_1 } });
+      const result = await call();
 
       expect(result.isError).toBeFalsy();
       const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
       expect(text.startsWith('<untrusted_data>')).toBe(true);
-      const structured = result.structuredContent as { findings: Array<{ id: string }>; counts: Record<string, number> };
-      expect(structured.findings.map((f) => f.id)).toEqual(['f1', 'f2']);
-      expect(structured.counts).toEqual({ CRITICAL: 1, WARNING: 1, SUGGESTION: 0 });
+      const structured = result.structuredContent as {
+        total_findings: number;
+        counts: Record<string, number>;
+        reviews: Array<{ agent_name: string; total_findings: number; findings: Array<{ id: string }> }>;
+        in_progress: unknown[];
+      };
+      expect(structured.reviews.map((r) => r.agent_name)).toEqual(['Security', 'Style']);
+      expect(structured.reviews[0]?.findings.map((f) => f.id)).toEqual(['f1', 'f2']);
+      expect(structured.reviews[1]?.total_findings).toBe(1);
+      expect(structured.total_findings).toBe(3);
+      expect(structured.counts).toEqual({ CRITICAL: 1, WARNING: 1, SUGGESTION: 1 });
+      expect(structured.in_progress).toEqual([]);
     });
 
-    it('filters by minSeverity and pages with limit/cursor', async () => {
-      api.runsById.set(
-        RUN_1,
-        buildRunDetail({
-          run_id: RUN_1,
-          findings: [
-            buildFinding({ id: 'c1', severity: 'CRITICAL' }),
-            buildFinding({ id: 'w1', severity: 'WARNING' }),
-            buildFinding({ id: 's1', severity: 'SUGGESTION' }),
-          ],
-        }),
-      );
+    it('lists running agents in in_progress with the retry hint', async () => {
+      seedPr();
+      api.runsByPrId.set('pr-1', [
+        buildRunSummary({ run_id: RUN_RUNNING, agent_id: 'a1', agent_name: 'Security', status: 'running' }),
+      ]);
 
-      const filtered = await client.callTool({
-        name: 'get_findings',
-        arguments: { runId: RUN_1, minSeverity: 'WARNING' },
-      });
-      const filteredIds = (filtered.structuredContent as { findings: Array<{ id: string }> }).findings.map(
-        (f) => f.id,
-      );
-      expect(filteredIds).toEqual(['c1', 'w1']);
+      const result = await call();
 
-      const page1 = await client.callTool({ name: 'get_findings', arguments: { runId: RUN_1, limit: 1 } });
-      const page1Body = page1.structuredContent as { findings: Array<{ id: string }>; next_cursor: number | null };
-      expect(page1Body.findings.map((f) => f.id)).toEqual(['c1']);
-      expect(page1Body.next_cursor).toBe(1);
-
-      const page2 = await client.callTool({
-        name: 'get_findings',
-        arguments: { runId: RUN_1, limit: 1, cursor: page1Body.next_cursor! },
-      });
-      const page2Body = page2.structuredContent as { findings: Array<{ id: string }>; next_cursor: number | null };
-      expect(page2Body.findings.map((f) => f.id)).toEqual(['w1']);
+      const body = result.structuredContent as { in_progress: unknown[]; hint?: string };
+      expect(body.in_progress).toEqual([{ agent_name: 'Security' }]);
+      expect(body.hint).toMatch(/~15s/);
     });
 
-    it('hints to retry while running, and surfaces the error while failed', async () => {
-      api.runsById.set(RUN_RUNNING, buildRunDetail({ run_id: RUN_RUNNING, status: 'running', findings: [] }));
-      const running = await client.callTool({ name: 'get_findings', arguments: { runId: RUN_RUNNING } });
-      expect((running.structuredContent as { hint?: string }).hint).toMatch(/~15s/);
-
-      api.runsById.set(
-        RUN_FAILED,
-        buildRunDetail({ run_id: RUN_FAILED, status: 'failed', error: 'provider timed out', findings: [] }),
-      );
-      const failed = await client.callTool({ name: 'get_findings', arguments: { runId: RUN_FAILED } });
-      const hint = (failed.structuredContent as { hint?: string }).hint ?? '';
-      expect(hint).toContain('provider timed out');
-      expect(hint).toContain('provider key');
-    });
-
-    it('gives isError for an unknown run', async () => {
-      const result = await client.callTool({ name: 'get_findings', arguments: { runId: RUN_MISSING } });
+    it('gives isError listing imported repos for an unknown repo', async () => {
+      api.repos = [buildRepo({ full_name: 'acme/known-repo' })];
+      const result = await client.callTool({ name: 'get_findings', arguments: { repo: 'acme/unknown', prNumber: 1 } });
       expect(result.isError).toBe(true);
+      const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
+      expect(text).toContain('acme/known-repo');
+    });
+
+    it('gives isError with a not-in-DevDigest message and hint for an unknown PR number', async () => {
+      seedPr();
+      const result = await call({ prNumber: 999 });
+      expect(result.isError).toBe(true);
+      const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
+      expect(text).toContain('PR #999 is not in DevDigest for acme/payments-api.');
+      expect(text).toContain('Open this PR in DevDigest once');
+    });
+
+    it('turns a listPullReviews failure into an apiErrorResult', async () => {
+      seedPr();
+      api.listPullReviewsFailWith = new ApiError('server', 'boom');
+      const result = await call();
+      expect(result.isError).toBe(true);
+      const text = (result.content as Array<{ text: string }>)[0]?.text ?? '';
+      expect(text).toContain('boom');
     });
   });
 

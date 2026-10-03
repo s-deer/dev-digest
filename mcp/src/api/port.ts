@@ -5,7 +5,8 @@ import type {
   ConventionStatus,
   PrMeta,
   Repo,
-  RunDetail,
+  ReviewRecord,
+  RunSummary,
   StartRunResponse,
 } from '@devdigest/shared';
 
@@ -19,8 +20,10 @@ export interface DevDigestApi {
   getConventions(repoId: string, statuses: ConventionStatus[]): Promise<ConventionsState>;
   /** `POST /runs`: start (or reuse) a run for one agent on a PR. */
   startRun(input: { repoId: string; prNumber: number; agentId: string }): Promise<StartRunResponse>;
-  /** `GET /runs/:id`: status + cost + (once done) review outcome + findings. */
-  getRun(runId: string): Promise<RunDetail>;
+  /** `GET /pulls/:id/reviews`: every persisted review of a PR with findings, newest first. */
+  listPullReviews(prId: string): Promise<ReviewRecord[]>;
+  /** `GET /pulls/:id/runs`: the PR's run history (any status, incl. running/failed), newest first. */
+  listPullRuns(prId: string): Promise<RunSummary[]>;
   /** `GET /repos/:id/pulls`: PRs imported for a repo, to resolve a PR number to its uuid. */
   listPulls(repoId: string): Promise<PrMeta[]>;
   /** `GET /pulls/:id/blast`: the PR's changed symbols, callers, and reached endpoints/crons. */

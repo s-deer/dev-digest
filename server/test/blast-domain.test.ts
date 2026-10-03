@@ -41,21 +41,6 @@ describe('toBlastRadius', () => {
     expect(bar?.callers).toHaveLength(1);
   });
 
-  it('drops a caller located in the symbol\'s own declaring file', () => {
-    const blast = toBlastRadius(
-      result({
-        changedSymbols: [{ file: 'a.ts', name: 'foo', kind: 'function' }],
-        callers: [
-          { file: 'a.ts', symbol: 'selfCaller', viaSymbol: 'foo', line: 2, rank: 10 },
-          { file: 'b.ts', symbol: 'realCaller', viaSymbol: 'foo', line: 4, rank: 1 },
-        ],
-      }),
-    );
-
-    const foo = blast.downstream.find((d) => d.symbol === 'foo');
-    expect(foo?.callers).toEqual([{ name: 'realCaller', file: 'b.ts', line: 4 }]);
-  });
-
   it('dedupes callers on file|line|symbol', () => {
     const blast = toBlastRadius(
       result({

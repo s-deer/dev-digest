@@ -6,7 +6,8 @@ import {
   ConventionStatus,
   PrMeta,
   Repo,
-  RunDetail,
+  ReviewRecord,
+  RunSummary,
   StartRunResponse,
 } from '@devdigest/shared';
 import type { McpConfig } from '../config.js';
@@ -58,10 +59,16 @@ export class HttpDevDigestApi implements DevDigestApi {
     return this.parse(StartRunResponse, body, 'POST /runs');
   }
 
-  async getRun(runId: string): Promise<RunDetail> {
-    const path = `/runs/${encodeURIComponent(runId)}`;
+  async listPullReviews(prId: string): Promise<ReviewRecord[]> {
+    const path = `/pulls/${encodeURIComponent(prId)}/reviews`;
     const body = await this.request(path);
-    return this.parse(RunDetail, body, `GET ${path}`);
+    return this.parse(ReviewRecord.array(), body, `GET ${path}`);
+  }
+
+  async listPullRuns(prId: string): Promise<RunSummary[]> {
+    const path = `/pulls/${encodeURIComponent(prId)}/runs`;
+    const body = await this.request(path);
+    return this.parse(RunSummary.array(), body, `GET ${path}`);
   }
 
   async listPulls(repoId: string): Promise<PrMeta[]> {

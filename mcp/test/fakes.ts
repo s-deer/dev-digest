@@ -6,7 +6,8 @@ import type {
   FindingRecord,
   PrMeta,
   Repo,
-  RunDetail,
+  ReviewRecord,
+  RunSummary,
   StartRunResponse,
 } from '@devdigest/shared';
 import type { DevDigestApi } from '../src/api/port.js';
@@ -129,25 +130,47 @@ export function buildBlastRadiusResponse(overrides: Partial<BlastRadiusResponse>
   };
 }
 
-export function buildRunDetail(overrides: Partial<RunDetail> = {}): RunDetail {
+export function buildReviewRecord(overrides: Partial<ReviewRecord> = {}): ReviewRecord {
+  return {
+    id: 'review-1',
+    pr_id: 'pr-1',
+    agent_id: 'agent-1',
+    run_id: 'run-1',
+    agent_name: 'Reviewer',
+    kind: 'review',
+    verdict: 'approve',
+    summary: 'Looks good.',
+    score: 80,
+    model: 'gpt-5',
+    grounding: null,
+    tokens_in: null,
+    tokens_out: null,
+    cost_usd: 0.01,
+    created_at: '2026-01-01T00:00:00.000Z',
+    findings: [],
+    ...overrides,
+  };
+}
+
+export function buildRunSummary(overrides: Partial<RunSummary> = {}): RunSummary {
   return {
     run_id: 'run-1',
-    status: 'done',
-    error: null,
     agent_id: 'agent-1',
     agent_name: 'Reviewer',
     provider: 'openai',
     model: 'gpt-5',
-    pr_id: 'pr-1',
-    pr_number: 482,
-    repo_full_name: 'acme/payments-api',
-    ran_at: '2026-01-01T00:00:00.000Z',
+    status: 'done',
+    error: null,
     duration_ms: 1200,
+    tokens_in: null,
+    tokens_out: null,
     cost_usd: 0.01,
+    findings_count: 0,
+    grounding: null,
+    ran_at: '2026-01-01T00:00:00.000Z',
     score: 80,
-    verdict: 'approve',
-    summary: 'Looks good.',
-    findings: [],
+    blockers: 0,
+    findings: null,
     ...overrides,
   };
 }
@@ -158,7 +181,8 @@ export class FakeDevDigestApi implements DevDigestApi {
   repos: Repo[] = [];
   conventionsByRepoId = new Map<string, ConventionsState>();
   startRunResponse: StartRunResponse = buildStartRunResponse();
-  runsById = new Map<string, RunDetail>();
+  reviewsByPrId = new Map<string, ReviewRecord[]>();
+  runsByPrId = new Map<string, RunSummary[]>();
   pullsByRepoId = new Map<string, PrMeta[]>();
   blastByPrId = new Map<string, BlastRadiusResponse>();
   /** Records every `prId` passed to `getBlastRadius`, so a test can assert
@@ -170,6 +194,10 @@ export class FakeDevDigestApi implements DevDigestApi {
   startRunFailWith: Error | null = null;
   /** Fails only `listPulls`, independent of `failWith` — same reason. */
   listPullsFailWith: Error | null = null;
+  /** Fails only `listPullReviews`, independent of `failWith` — same reason. */
+  listPullReviewsFailWith: Error | null = null;
+  /** Fails only `listPullRuns`, independent of `failWith` — same reason. */
+  listPullRunsFailWith: Error | null = null;
   /** Fails only `getBlastRadius`, independent of `failWith` — same reason. */
   getBlastRadiusFailWith: Error | null = null;
 
@@ -198,11 +226,16 @@ export class FakeDevDigestApi implements DevDigestApi {
     return this.startRunResponse;
   }
 
-  async getRun(runId: string): Promise<RunDetail> {
+  async listPullReviews(prId: string): Promise<ReviewRecord[]> {
+    if (this.listPullReviewsFailWith) throw this.listPullReviewsFailWith;
     if (this.failWith) throw this.failWith;
-    const detail = this.runsById.get(runId);
-    if (!detail) throw new ApiError('not_found', `Run ${runId} not found.`);
-    return detail;
+    return this.reviewsByPrId.get(prId) ?? [];
+  }
+
+  async listPullRuns(prId: string): Promise<RunSummary[]> {
+    if (this.listPullRunsFailWith) throw this.listPullRunsFailWith;
+    if (this.failWith) throw this.failWith;
+    return this.runsByPrId.get(prId) ?? [];
   }
 
   async listPulls(repoId: string): Promise<PrMeta[]> {

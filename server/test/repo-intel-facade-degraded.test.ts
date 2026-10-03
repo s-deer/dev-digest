@@ -83,6 +83,25 @@ describe('RepoIntel facade — degraded contract (flag off)', () => {
       .toContain(blast.reason);
   });
 
+  it('getBlastRadius ripgrep fallback excludes references from the symbol\'s declaring file', async () => {
+    const svc = buildDegradedService({
+      flag: false,
+      basics: { owner: 'o', name: 'n', clonePath: '/nonexistent-clone' } as RepoBasics,
+    });
+    (svc as unknown as { container: Record<string, unknown> }).container.codeIndex = {
+      symbols: async () => [
+        { name: 'foo', path: 'a.ts', kind: 'function', line: 1 },
+        { name: 'caller', path: 'b.ts', kind: 'function', line: 1 },
+      ],
+      references: async () => [
+        { fromPath: 'a.ts', line: 5 },
+        { fromPath: 'b.ts', line: 3 },
+      ],
+    };
+    const blast = await svc.getBlastRadius('r1', ['a.ts']);
+    expect(blast.callers.map((c) => c.file)).toEqual(['b.ts']);
+  });
+
   it('getIndexState → degraded row (never throws) when no row exists', async () => {
     const svc = buildDegradedService({ flag: false, indexStateRow: null });
     const state = await svc.getIndexState('r1');

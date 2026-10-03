@@ -1,4 +1,4 @@
-import type { FindingRecord, RunDetail, Severity } from '@devdigest/shared';
+import type { FindingRecord, ReviewRecord, RunSummary, Severity } from '@devdigest/shared';
 import { MAX_TEXT_CHARS } from './conventions.js';
 
 /** Same cutoff as `server/src/modules/reviews/findings-summary.ts` (see
@@ -33,23 +33,37 @@ export interface ShapedFinding extends Record<string, unknown> {
   suggestion?: string | null;
 }
 
-export interface ShapedFindings extends Record<string, unknown> {
-  run_id: string;
-  status: RunDetail['status'];
+export interface ShapedReview extends Record<string, unknown> {
+  agent_id: string | null;
+  agent_name: string | null;
+  verdict: ReviewRecord['verdict'];
+  score: number | null;
   cost_usd: number | null;
-  verdict: RunDetail['verdict'];
-  counts: FindingsCounts;
+  /** Non-dismissed findings, before `minSeverity` and the per-review cap. */
+  total_findings: number;
   findings: ShapedFinding[];
-  next_cursor: number | null;
+  truncated: boolean;
+}
+
+export interface ShapedPrFindings extends Record<string, unknown> {
+  repo: string;
+  prNumber: number;
+  total_findings: number;
+  counts: FindingsCounts;
+  reviews: ShapedReview[];
+  in_progress: Array<{ agent_name: string | null }>;
+  failed: Array<{ agent_name: string | null; error: string | null }>;
   truncated: boolean;
   hint?: string;
 }
 
-export interface ShapeFindingsOptions {
+export interface ShapePrFindingsOptions {
+  repo: string;
+  prNumber: number;
   format?: FindingsResponseFormat;
   minSeverity?: Severity;
+  /** Per review. */
   limit?: number;
-  cursor?: number;
 }
 
 function truncate(text: string, max: number): string {
@@ -100,56 +114,119 @@ export function fitToBudget<T>(items: T[], maxChars: number): { items: T[]; trun
   return { items: out, truncated };
 }
 
-function hintFor(detail: RunDetail, truncated: boolean): string | undefined {
-  if (detail.status === 'running') return 'Run is still in progress — call get_findings again in ~15s.';
-  if (detail.status === 'failed') {
-    const reason = detail.error ? ` (${detail.error})` : '';
-    return `Run failed${reason} — check the provider key and retry.`;
+/** First (= newest, the API returns newest-first) item per agent; an item
+ *  with a null `agent_id` is kept on its own. */
+function latestPerAgent<T extends { agent_id: string | null }>(items: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    if (item.agent_id !== null) {
+      if (seen.has(item.agent_id)) continue;
+      seen.add(item.agent_id);
+    }
+    out.push(item);
   }
+  return out;
+}
+
+function hintFor(
+  inProgress: ShapedPrFindings['in_progress'],
+  failed: ShapedPrFindings['failed'],
+  reviewCount: number,
+  truncated: boolean,
+): string | undefined {
+  if (inProgress.length > 0) {
+    return `${inProgress.length} run(s) still in progress — call get_findings again in ~15s.`;
+  }
+  if (failed.length > 0) {
+    const reason = failed[0]?.error ? ` (${failed[0].error})` : '';
+    const more = failed.length > 1 ? ` [+${failed.length - 1} more failed run(s)]` : '';
+    return `Run failed${reason} — check the provider key and retry.${more}`;
+  }
+  if (reviewCount === 0) return 'No reviews yet — start one with run_agent_on_pr.';
   if (truncated) return 'Response was truncated to fit the size budget — narrow with minSeverity or a smaller limit.';
   return undefined;
 }
 
-/**
- * Shapes a `RunDetail` into `get_findings`'s response: drops dismissed
- * findings, counts the rest by severity, filters by `minSeverity` (at least
- * this severe), sorts by severity then confidence (desc), pages with an
- * offset cursor, and fits the shared text-block budget by dropping trailing
- * items rather than truncating one mid-item.
- */
-export function shapeFindings(detail: RunDetail, options: ShapeFindingsOptions = {}): ShapedFindings {
-  const format = options.format ?? 'concise';
-  const limit = Math.min(Math.max(Math.trunc(options.limit ?? FINDINGS_DEFAULT_LIMIT), 1), FINDINGS_MAX_LIMIT);
-  const cursor = Math.max(Math.trunc(options.cursor ?? 0), 0);
-
-  const open = detail.findings.filter((f) => !isDismissed(f));
-  const counts = countBySeverity(open);
-
-  const minRank = options.minSeverity ? SEVERITY_RANK[options.minSeverity] : undefined;
-  const filtered = minRank === undefined ? open : open.filter((f) => SEVERITY_RANK[f.severity] <= minRank);
+function shapeReview(
+  review: ReviewRecord,
+  options: { format: FindingsResponseFormat; limit: number; minRank: number | undefined; budget: number },
+): ShapedReview {
+  const open = review.findings.filter((f) => !isDismissed(f));
+  const filtered = options.minRank === undefined ? open : open.filter((f) => SEVERITY_RANK[f.severity] <= options.minRank!);
   const sorted = [...filtered].sort(
     (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || b.confidence - a.confidence,
   );
-
-  const page = sorted.slice(cursor, cursor + limit);
+  const capped = sorted.slice(0, options.limit);
   const fitted = fitToBudget(
-    page.map((f) => shapeOne(f, format)),
-    MAX_TEXT_CHARS,
+    capped.map((f) => shapeOne(f, options.format)),
+    options.budget,
   );
-  const truncated = fitted.truncated || cursor + page.length < sorted.length;
-  const nextCursor = cursor + fitted.items.length < sorted.length ? cursor + fitted.items.length : null;
-
-  const result: ShapedFindings = {
-    run_id: detail.run_id,
-    status: detail.status,
-    cost_usd: detail.cost_usd,
-    verdict: detail.verdict,
-    counts,
+  return {
+    agent_id: review.agent_id,
+    agent_name: review.agent_name ?? null,
+    verdict: review.verdict,
+    score: review.score,
+    cost_usd: review.cost_usd ?? null,
+    total_findings: open.length,
     findings: fitted.items,
-    next_cursor: nextCursor,
+    truncated: fitted.truncated || sorted.length > capped.length,
+  };
+}
+
+/**
+ * Shapes a PR's reviews + run history into `get_findings`'s response: the
+ * latest `kind:'review'` per agent, each with its non-dismissed findings
+ * (filtered by `minSeverity`, sorted severity then confidence, capped per
+ * review, fitted to a per-review share of the text budget), plus the agents
+ * whose newest run is still running or failed without a newer review.
+ */
+export function shapePrFindings(
+  reviews: ReviewRecord[],
+  runs: RunSummary[],
+  options: ShapePrFindingsOptions,
+): ShapedPrFindings {
+  const format = options.format ?? 'concise';
+  const limit = Math.min(Math.max(Math.trunc(options.limit ?? FINDINGS_DEFAULT_LIMIT), 1), FINDINGS_MAX_LIMIT);
+  const minRank = options.minSeverity ? SEVERITY_RANK[options.minSeverity] : undefined;
+
+  const latestReviews = latestPerAgent(reviews.filter((r) => r.kind === 'review'));
+  const budget = Math.floor(MAX_TEXT_CHARS / Math.max(latestReviews.length, 1));
+  const shaped = latestReviews.map((r) => shapeReview(r, { format, limit, minRank, budget }));
+
+  const counts: FindingsCounts = { CRITICAL: 0, WARNING: 0, SUGGESTION: 0 };
+  for (const r of latestReviews) {
+    const c = countBySeverity(r.findings.filter((x) => !isDismissed(x)));
+    counts.CRITICAL += c.CRITICAL;
+    counts.WARNING += c.WARNING;
+    counts.SUGGESTION += c.SUGGESTION;
+  }
+
+  const inProgress: ShapedPrFindings['in_progress'] = [];
+  const failed: ShapedPrFindings['failed'] = [];
+  for (const run of latestPerAgent(runs)) {
+    if (run.status === 'running') {
+      inProgress.push({ agent_name: run.agent_name });
+    } else if (run.status === 'failed') {
+      const newerReview = latestReviews.some(
+        (r) => r.agent_id === run.agent_id && run.agent_id !== null && run.ran_at !== null && r.created_at > run.ran_at,
+      );
+      if (!newerReview) failed.push({ agent_name: run.agent_name, error: run.error });
+    }
+  }
+
+  const truncated = shaped.some((r) => r.truncated);
+  const result: ShapedPrFindings = {
+    repo: options.repo,
+    prNumber: options.prNumber,
+    total_findings: shaped.reduce((n, r) => n + r.total_findings, 0),
+    counts,
+    reviews: shaped,
+    in_progress: inProgress,
+    failed,
     truncated,
   };
-  const hint = hintFor(detail, truncated);
+  const hint = hintFor(inProgress, failed, shaped.length, truncated);
   if (hint) result.hint = hint;
   return result;
 }
