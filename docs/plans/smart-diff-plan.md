@@ -13,7 +13,7 @@ Homework `tasks/smart-diff/homework.md` (L03). Today the **Files changed** tab l
 
 **How it runs:**
 - After approval, the main session writes this plan to `docs/plans/smart-diff-plan.md` (the saved preference).
-- The plan uses the planner's S-step format (Files / Change / Skills / Tests / Acceptance / Verify), so implementer and plan-verifier can read it.
+- The plan uses the implementation-planner's S-step format (Files / Change / Skills / Tests / Acceptance / Verify), so implementer and plan-verifier can read it.
 - Each **Phase** goes to its own `implementer` agent, one after another. The main session checks each phase's report before starting the next.
 
 **INSIGHTS that apply:**
