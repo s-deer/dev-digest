@@ -20,6 +20,7 @@ import {
   GenerateIntentBody,
   SetProjectContextBody,
   ProjectContextRecord,
+  BriefModelOutput,
 } from '@devdigest/shared';
 
 /**
@@ -309,5 +310,27 @@ describe('Project Context contracts', () => {
     const many = Array.from({ length: 51 }, (_, i) => `docs/${i}.md`);
     expect(SetProjectContextBody.safeParse({ repo_id, paths: many }).success).toBe(false);
     expect(SetProjectContextBody.safeParse({ repo_id, paths: many.slice(0, 50) }).success).toBe(true);
+  });
+});
+
+describe('BriefModelOutput', () => {
+  const risk = {
+    file_refs: ['src/a.ts'],
+    explanation: 'e',
+    title: 't',
+    kind: 'k',
+    severity: 'high' as const,
+  };
+  const focus = { file: 'src/a.ts', line: 1, reason: 'r' };
+  const valid = { summary: 'ok', risks: [risk], review_focus: [focus] };
+
+  it('accepts a valid output and enforces the limits', () => {
+    expect(BriefModelOutput.safeParse(valid).success).toBe(true);
+    expect(BriefModelOutput.safeParse({ ...valid, risks: Array(7).fill(risk) }).success).toBe(false);
+    expect(BriefModelOutput.safeParse({ ...valid, review_focus: Array(9).fill(focus) }).success).toBe(false);
+    expect(BriefModelOutput.safeParse({ ...valid, summary: 'x'.repeat(601) }).success).toBe(false);
+    expect(
+      BriefModelOutput.safeParse({ ...valid, risks: [{ ...risk, file_refs: [] }] }).success,
+    ).toBe(false);
   });
 });
