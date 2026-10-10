@@ -24,8 +24,42 @@
     "noneStated": "None stated",
     "emptyTitle": "No brief yet",
     "emptyBody": "Generate a Why+Risk brief for this PR.",
-    "generate": "Generate brief",
+    "generate": "Derive intent",
     "loadError": "Couldn't load the PR intent.",
     "generateError": "Couldn't generate the PR brief."
+  },
+  "brief": {
+    "label": "PR Brief",
+    "summary": "Summary",
+    "risksTitle": "Risk areas",
+    "focusTitle": "Review focus",
+    "focusEmpty": "No specific review focus.",
+    "removedNote": "Left out because they could not be tied to this PR: {risks} risk(s), {focus} focus item(s).",
+    "generatedWithout": "Generated without: {facts}",
+    "fact": {
+      "intent": "derived intent",
+      "intentStale": "up-to-date intent",
+      "blast": "blast radius",
+      "linkedIssue": "linked issue",
+      "description": "PR description",
+      "noAgent": "specs (no agent has reviewed this repo)",
+      "specsUnavailable": "specs (repository unavailable)",
+      "noSpecs": "no specs attached"
+    },
+    "outdated": "Outdated",
+    "refresh": "Refresh",
+    "generate": "Generate brief",
+    "emptyTitle": "No PR brief yet",
+    "emptyBody": "Summarise what this PR changes, where the risk is and what to review first.",
+    "generateError": "Couldn't generate the PR brief.",
+    "loadError": "Couldn't load the PR brief.",
+    "retry": "Retry",
+    "severity": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "riskFileAria": "Open {file} in Files changed",
+    "notInDiff": "File not in this PR's diff: {file}"
   }
 }

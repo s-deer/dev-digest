@@ -8,7 +8,7 @@ import { Icon } from "@devdigest/ui";
 import type { FindingRecord } from "@devdigest/shared";
 import type { PrFile } from "@/lib/types";
 import { AUTO_EXPAND_MAX_LINES } from "../constants";
-import { parsePatch, type Line } from "../helpers";
+import { parsePatch, type DiffTarget, type Line } from "../helpers";
 import {
   buildThreads,
   keysForLine,
@@ -55,10 +55,13 @@ export function FileCard({
   file,
   commenting,
   findings,
+  target,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
   findings?: DiffFindingsApi;
+  /** Set only on the target file: starts open, scrolls itself into view. */
+  target?: DiffTarget;
 }) {
   const t = useTranslations("shell");
   const tReview = useTranslations("prReview");
@@ -93,8 +96,10 @@ export function FileCard({
   // (AUTO_EXPAND_MAX_LINES). Findings arrive asynchronously after mount (the
   // review query resolves later), so also auto-open the first time this file
   // gains findings — but never fight a user's own manual toggle afterwards.
+  const isTarget = !!target;
   const [open, setOpen] = React.useState(
-    hasFindings || (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES,
+    isTarget ||
+      hasFindings || (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES,
   );
   const userToggled = React.useRef(false);
   const hadFindings = React.useRef(hasFindings);
@@ -102,6 +107,19 @@ export function FileCard({
     if (!userToggled.current && hasFindings && !hadFindings.current) setOpen(true);
     hadFindings.current = hasFindings;
   }, [hasFindings]);
+
+  // Deep link: once, on mount, scroll the target line (or, when it isn't
+  // rendered — no patch, outside the hunks — the file header) into view.
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!target || !cardRef.current) return;
+    const line =
+      target.line != null
+        ? cardRef.current.querySelector(`[data-new-line="${target.line}"]`)
+        : null;
+    (line ?? cardRef.current).scrollIntoView({ block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only by design
+  }, []);
 
   const toggleOpen = () => {
     userToggled.current = true;
@@ -124,7 +142,7 @@ export function FileCard({
     : 0;
 
   return (
-    <div style={s.fileCard}>
+    <div ref={cardRef} style={s.fileCard}>
       <div onClick={toggleOpen} style={s.fileHeader}>
         <Icon.ChevronRight size={13} style={chevronFor(open)} />
         <Icon.FileText size={14} style={s.fileIcon} />
@@ -166,6 +184,9 @@ export function FileCard({
                 commenting={commenting}
                 lineFindings={findingsForLine(ln, findingsByLineKey)}
                 findings={findings}
+                highlighted={
+                  target?.line != null && ln.kind !== "del" && ln.newNo === target.line
+                }
               />
             ))
           )}

@@ -51,3 +51,17 @@ export function diffTotals(files: PrFile[]): { add: number; del: number } {
     { add: 0, del: 0 },
   );
 }
+
+/** The Files-changed deep-link target from the URL (`?file=&line=`). `file`
+   is already decoded by URLSearchParams; `line` counts only as an integer
+   >= 1, anything else becomes a file-level target. Null when `file` is
+   absent or empty. */
+export function parseDiffTarget(sp: {
+  get(key: string): string | null;
+}): { file: string; line: number | null } | null {
+  const file = sp.get("file");
+  if (!file) return null;
+  const raw = sp.get("line");
+  const n = raw != null && /^\d+$/.test(raw) ? Number(raw) : NaN;
+  return { file, line: Number.isSafeInteger(n) && n >= 1 ? n : null };
+}

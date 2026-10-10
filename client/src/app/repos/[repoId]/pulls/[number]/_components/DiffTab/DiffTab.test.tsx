@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import type { ReviewRecord, SmartDiffResponse } from "@devdigest/shared";
 import shell from "../../../../../../../../messages/en/shell.json";
 import prReview from "../../../../../../../../messages/en/prReview.json";
+import brief from "../../../../../../../../messages/en/brief.json";
 import { DiffTab } from "./DiffTab";
 
 const {
@@ -93,16 +94,37 @@ const SMART_DIFF: SmartDiffResponse = {
   split_suggestion: { too_big: false, total_lines: 1, proposed_splits: [] },
 };
 
-function renderTab() {
+const DOC = {
+  path: "docs/guide.md",
+  additions: 2,
+  deletions: 0,
+  patch: ["@@ -10,1 +10,3 @@", " intro text", "+deep link target text", "+tail text"].join("\n"),
+};
+
+const SMART_DIFF_WITH_DOCS: SmartDiffResponse = {
+  groups: [
+    ...SMART_DIFF.groups,
+    {
+      role: "docs",
+      files: [{ path: DOC.path, additions: DOC.additions, deletions: DOC.deletions, finding_lines: [] }],
+    },
+  ],
+  split_suggestion: SMART_DIFF.split_suggestion,
+};
+
+function renderTab(target?: { file: string; line: number | null } | null, files = [FILE]) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ shell, prReview }}>
-      <DiffTab prId="p1" filesCount={1} files={[FILE]} canComment />
+    <NextIntlClientProvider locale="en" messages={{ shell, prReview, brief }}>
+      <DiffTab prId="p1" filesCount={files.length} files={files} canComment target={target} />
     </NextIntlClientProvider>,
   );
 }
 
+const scrollIntoViewMock = vi.fn();
+
 beforeEach(() => {
   vi.clearAllMocks();
+  Element.prototype.scrollIntoView = scrollIntoViewMock;
   usePrCommentsMock.mockReturnValue({ data: [] });
   useCreatePrCommentMock.mockReturnValue({ isPending: false, mutateAsync: vi.fn() });
   usePrReviewsMock.mockReturnValue({ data: REVIEWS });
@@ -163,5 +185,42 @@ describe("DiffTab", () => {
 
     expect(screen.getByText("Review hasn't been run yet")).toBeInTheDocument();
     expect(screen.queryByText("Hardcoded secret")).not.toBeInTheDocument();
+  });
+
+  it("deep link: expands a default-collapsed group, shows the target line and scrolls to it", () => {
+    useSmartDiffMock.mockReturnValue({ data: SMART_DIFF_WITH_DOCS, isLoading: false, isError: false });
+    renderTab({ file: DOC.path, line: 11 }, [FILE, DOC]);
+
+    expect(screen.getByText("deep link target text")).toBeInTheDocument();
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    const row = scrollIntoViewMock.mock.contexts[0] as HTMLElement;
+    expect(row.getAttribute("data-new-line")).toBe("11");
+    expect(screen.queryByText(/File not in this PR/)).not.toBeInTheDocument();
+  });
+
+  it("deep link: without a rendered line it falls back to scrolling the file header", () => {
+    useSmartDiffMock.mockReturnValue({ data: SMART_DIFF_WITH_DOCS, isLoading: false, isError: false });
+    renderTab({ file: DOC.path, line: 999 }, [FILE, DOC]);
+    expect(screen.getByText("tail text")).toBeInTheDocument();
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+    expect((scrollIntoViewMock.mock.contexts[0] as HTMLElement).hasAttribute("data-new-line")).toBe(false);
+
+    cleanup();
+    scrollIntoViewMock.mockClear();
+    renderTab({ file: FILE.path, line: null });
+    expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("deep link: an unknown file shows the not-in-diff note naming it and still renders the diff", () => {
+    renderTab({ file: "src/gone.ts", line: 3 });
+    expect(screen.getByText("File not in this PR's diff: src/gone.ts")).toBeInTheDocument();
+    expect(screen.getByText(FILE.path)).toBeInTheDocument();
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+  });
+
+  it("without a target nothing scrolls and no note is shown", () => {
+    renderTab();
+    expect(scrollIntoViewMock).not.toHaveBeenCalled();
+    expect(screen.queryByText(/File not in this PR/)).not.toBeInTheDocument();
   });
 });

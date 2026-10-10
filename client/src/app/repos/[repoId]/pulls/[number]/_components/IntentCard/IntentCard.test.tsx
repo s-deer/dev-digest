@@ -91,7 +91,7 @@ describe("IntentCard", () => {
     renderCard();
 
     expect(screen.getByText("No brief yet")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Generate brief" }));
+    fireEvent.click(screen.getByRole("button", { name: "Derive intent" }));
     expect(hooks.mutate).toHaveBeenCalledWith(false);
   });
 

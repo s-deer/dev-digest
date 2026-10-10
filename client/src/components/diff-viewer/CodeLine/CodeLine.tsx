@@ -21,6 +21,7 @@ export function CodeLine({
   commenting,
   lineFindings,
   findings,
+  highlighted,
 }: {
   ln: Line;
   path: string;
@@ -28,6 +29,8 @@ export function CodeLine({
   commenting?: DiffCommentApi;
   lineFindings: FindingRecord[];
   findings?: DiffFindingsApi;
+  /** Deep-link target line: tinted so the eye lands on it. */
+  highlighted?: boolean;
 }) {
   const t = useTranslations("prReview");
   const [hover, setHover] = React.useState(false);
@@ -54,7 +57,10 @@ export function CodeLine({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
+      <div
+        style={lineRowFor(ln.kind, highlighted)}
+        data-new-line={ln.kind !== "del" ? ln.newNo : undefined}
+      >
         {topSev && sevColor && <span aria-hidden="true" style={sevStripeFor(sevColor)} />}
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (

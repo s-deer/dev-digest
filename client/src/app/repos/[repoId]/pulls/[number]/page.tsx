@@ -13,7 +13,7 @@ import { RepoNotFound } from "@/components/repo-not-found";
 import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
-import { DiffTab } from "./_components/DiffTab";
+import { DiffTab, parseDiffTarget } from "./_components/DiffTab";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
 import { usePullDetail, usePulls } from "../../../../../lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
@@ -61,13 +61,35 @@ export default function PRDetailPage() {
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
+  const navigate = (sp: URLSearchParams, mode: "push" | "replace") => {
+    const url = `/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`;
+    if (mode === "push") router.push(url);
+    else router.replace(url);
+  };
   const setParam = (key: string, val: string | null) => {
     const sp = new URLSearchParams(search.toString());
     if (val == null) sp.delete(key);
     else sp.set(key, val);
-    router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
+    navigate(sp, "replace");
   };
-  const setTab = (t: string) => setParam("tab", t);
+  // Leaving Files changed must not keep a stale deep-link target in the URL.
+  const setTab = (t: string) => {
+    const sp = new URLSearchParams(search.toString());
+    sp.set("tab", t);
+    sp.delete("file");
+    sp.delete("line");
+    navigate(sp, "replace");
+  };
+  // Brief → Files changed: a real history entry, so Back returns to Overview.
+  const openFile = (file: string, line: number | null) => {
+    const sp = new URLSearchParams(search.toString());
+    sp.set("tab", "diff");
+    sp.set("file", file);
+    if (line == null) sp.delete("line");
+    else sp.set("line", String(line));
+    navigate(sp, "push");
+  };
+  const diffTarget = parseDiffTarget(search);
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = reviews ?? [];
@@ -143,6 +165,7 @@ export default function PRDetailPage() {
             repoId={repoId}
             repoFullName={repoFullName}
             headSha={pr.head_sha}
+            onOpenFile={openFile}
           />
         )}
 
@@ -179,6 +202,7 @@ export default function PRDetailPage() {
             filesCount={pr.files_count}
             files={pr.files}
             canComment={pr.status === "open"}
+            target={diffTarget}
           />
         )}
       </div>

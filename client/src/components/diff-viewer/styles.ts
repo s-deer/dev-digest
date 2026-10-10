@@ -79,7 +79,7 @@ export function chevronFor(open: boolean): CSSProperties {
    border here — a finding's stripe is a separate absolutely-positioned span
    (`sevStripe`) so lines without a finding never shift by the stripe's
    width. */
-export function lineRowFor(kind: Line["kind"]): CSSProperties {
+export function lineRowFor(kind: Line["kind"], highlighted = false): CSSProperties {
   const background = kind === "add" ? "var(--code-add)" : kind === "del" ? "var(--code-del)" : "transparent";
   return {
     display: "flex",
@@ -88,6 +88,7 @@ export function lineRowFor(kind: Line["kind"]): CSSProperties {
     lineHeight: "20px",
     background,
     position: "relative",
+    ...(highlighted ? { outline: "2px solid var(--accent)", outlineOffset: -2 } : null),
   };
 }
 
