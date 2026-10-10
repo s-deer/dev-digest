@@ -9,7 +9,7 @@ import type {
   UnifiedDiff,
 } from '@devdigest/shared';
 import { Review as ReviewSchema } from '@devdigest/shared';
-import { assemblePrompt } from '../prompt.js';
+import { assemblePrompt, type ProjectDocInput } from '../prompt.js';
 import { groundFindings, groundingSummary } from '../grounding.js';
 import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
 
@@ -60,6 +60,10 @@ export interface ReviewInput {
   memory?: string[];
   /** Project-context spec chunks (untrusted; delimiter-wrapped downstream). */
   specs?: string[];
+  /** Agent-attached project documents (untrusted) → `## Project context`. */
+  projectContext?: ProjectDocInput[];
+  /** Skill-attached project documents (untrusted) → `## Project specifications`. */
+  projectSpecs?: ProjectDocInput[];
   /**
    * Optional callers-of-changed-symbols digest (T1.3). Untrusted; rendered
    * before the diff section. Empty/undefined → section omitted.
@@ -141,6 +145,8 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     skills: input.skills,
     memory: input.memory,
     specs: input.specs,
+    projectContext: input.projectContext,
+    projectSpecs: input.projectSpecs,
     callers: input.callers,
     repoMap: input.repoMap,
     prDescription: input.prDescription,

@@ -190,6 +190,38 @@ describe('reviewPullRequest (engine)', () => {
     expect(outcome.assembly.user).toContain('## PR intent (derived)');
   });
 
+  it('attached project documents add no LLM calls and reach the assembly (AC-31)', async () => {
+    const diff = await new MockGitClient().diff();
+    const run = async (extra: Record<string, unknown>) => {
+      const llm = new MockLLMProvider('openai', { structured: fixture });
+      let calls = 0;
+      const original = llm.completeStructured.bind(llm);
+      llm.completeStructured = (async (...args: Parameters<typeof original>) => {
+        calls += 1;
+        return original(...args);
+      }) as typeof llm.completeStructured;
+      const outcome = await reviewPullRequest({
+        systemPrompt: 'security reviewer',
+        model: 'gpt-4.1',
+        diff,
+        llm,
+        ...extra,
+      });
+      return { calls, outcome };
+    };
+
+    const without = await run({});
+    const withDocs = await run({
+      projectContext: [{ path: 'docs/a.md', content: 'A', tokens: 5 }],
+      projectSpecs: [{ path: 'specs/b.md', content: 'B', tokens: 4 }],
+    });
+
+    expect(withDocs.calls).toBe(without.calls);
+    expect(withDocs.outcome.assembly.user).toContain('## Project context');
+    expect(withDocs.outcome.assembly.project_context_tokens).toBe(5);
+    expect(withDocs.outcome.assembly.project_specs_tokens).toBe(4);
+  });
+
   it('forwards sessionId to every LLM call (OpenRouter session grouping)', async () => {
     const seen: (string | undefined)[] = [];
     const recorder: LLMProvider = {

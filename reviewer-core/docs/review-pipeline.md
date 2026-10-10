@@ -41,6 +41,14 @@ For each chunk (`run.ts:162`):
 2. `assemblePrompt({ ...promptParts, diff: chunk.diffText })`. The optional
    slots (`skills`, `memory`, `specs`, `callers`, `repoMap`, `prDescription`)
    are the same for every chunk; only the diff changes.
+   Attached project documents (`projectContext` → `## Project context`,
+   `projectSpecs` → `## Project specifications`) are such slots too: each doc is
+   `renderProjectDocBlock(doc)` (`src/prompt.ts:223`), an `<untrusted
+   source="project-doc:<path>">` block with the path sanitised. Both sections
+   are omitted when empty, and `PROJECT_DOCS_GUARD` (`src/prompt.ts:34`) is
+   appended to the injection guard only when at least one doc is present
+   (`src/prompt.ts:236`), so a prompt without attachments is unchanged. The
+   caller counts tokens over the `renderProjectDocBlock` string.
 3. `llm.completeStructured<Review>` with the shared `Review` Zod schema and
    `maxRetries` (default `DEFAULT_REVIEW_MAX_RETRIES = 2` reprompts).
 4. Tokens and cost are added up (see
