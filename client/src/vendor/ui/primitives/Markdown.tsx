@@ -2,8 +2,18 @@ import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-/** Markdown renderer (replaces prototype mdLite). Inline + GFM. */
-export function Markdown({ children }: { children?: string | null }) {
+/**
+ * Markdown renderer (replaces prototype mdLite). Inline + GFM.
+ * `blockRemoteImages` is for untrusted documents: images render as their alt
+ * text (no request is made) and links get `rel="noopener noreferrer"`.
+ */
+export function Markdown({
+  children,
+  blockRemoteImages = false,
+}: {
+  children?: string | null;
+  blockRemoteImages?: boolean;
+}) {
   if (!children) return null;
   return (
     <div className="dd-md" style={{ fontSize: "inherit", lineHeight: 1.55 }}>
@@ -29,10 +39,15 @@ export function Markdown({ children }: { children?: string | null }) {
             </code>
           ),
           a: ({ children, href }) => (
-            <a href={href} style={{ color: "var(--accent-text)", textDecoration: "underline" }}>
+            <a
+              href={href}
+              rel={blockRemoteImages ? "noopener noreferrer" : undefined}
+              style={{ color: "var(--accent-text)", textDecoration: "underline" }}
+            >
               {children}
             </a>
           ),
+          ...(blockRemoteImages ? { img: ({ alt }) => <span>{alt ?? ""}</span> } : {}),
         }}
       >
         {children}

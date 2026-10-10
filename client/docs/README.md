@@ -6,3 +6,4 @@ as `docs/<topic>.md`.
 
 - [data-flow.md](data-flow.md): page → hook → `api.ts` → TanStack Query; which cache key feeds each PR screen, what each mutation invalidates, and known stale spots.
 - [findings-and-cost-ui.md](findings-and-cost-ui.md): severity badges and popover, severity pills and filter, and cost formatting, with the rules each follows.
+- [project-context.md](project-context.md): the Project Context page, shared picker, agent and skill Context tabs, trace drawer blocks, data hooks, safe Markdown preview, `g d` shortcut, and known limitations.

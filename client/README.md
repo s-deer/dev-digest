@@ -26,9 +26,10 @@ flowchart TD
   ROOT["/"] -->|"useRepos → GET /repos"| PULLS["/repos/:repoId/pulls<br/>PR list"]
   ONB["/onboarding<br/>add repo"] -->|"POST /repos"| API[("Fastify API")]
   PULLS --> PR["/pulls/:number<br/>review detail<br/>(overview · diff · findings)"]
+  CTX["/repos/:repoId/context<br/>Project Context (read-only)"]
 
-   AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills)"]
-    SKILLS["/skills<br/>skill master pane · create / import"] --> SKILL["/skills/:id<br/>Config · Preview · Versions"]
+   AGENTS["/agents"] --> AGENT["/agents/:id<br/>editor (config · skills · context)"]
+    SKILLS["/skills<br/>skill master pane · create / import"] --> SKILL["/skills/:id<br/>Config · Context · Preview · Versions"]
   SETTINGS["/settings/:section<br/>API keys · models"]
 
   PULLS -->|"GET /repos/:id/pulls · /repos/:id/index-state"| API
@@ -38,7 +39,13 @@ flowchart TD
    SKILL -->|"/skills/:id · /skills/:id/versions · …/restore"| API
    AGENT -->|"/agents/:id/skills (ordered, per-agent enabled)"| API
   SETTINGS -->|"/settings · /providers"| API
+  CTX -->|"GET /repos/:id/project-context · …/document?path="| API
+  AGENT -->|"GET/PUT /agents/:id/project-context (Context tab)"| API
+  SKILL -->|"GET/PUT /skills/:id/project-context (Context tab)"| API
 ```
+
+Project Context (page, picker, tabs, trace blocks) is described in
+[`docs/project-context.md`](docs/project-context.md).
 
 Cross-cutting chrome lives in `src/components/app-shell` (nav, breadcrumbs,
 `g`-then-key shortcuts). Pages are thin; feature logic sits in colocated

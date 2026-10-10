@@ -37,5 +37,7 @@ pnpm test         # vitest + jsdom, fetch mocked — no API needed
   `engineering-insights` skill.
 - Read `README.md` for the UI route map and which endpoints each page leans
   on.
+- Read `docs/project-context.md` when touching the Project Context page, picker,
+  Context tabs, or the trace drawer's project-doc blocks.
 - Read `../server/README.md` when you need the exact shape of an endpoint.
 - Read `../e2e/README.md` when a change affects a seeded browser flow.

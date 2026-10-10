@@ -7,6 +7,7 @@ import type { Skill } from "@devdigest/shared";
 import { SkillTypeBadge } from "../../../../../components/skill-type-badge";
 import { ApiError } from "../../../../../lib/api";
 import { ConfigTab } from "./_components/ConfigTab";
+import { ContextTab } from "./_components/ContextTab";
 import { PreviewTab } from "./_components/PreviewTab";
 import { VersioningTab } from "./_components/VersioningTab";
 import { TABS, type SkillTabKey } from "./constants";
@@ -74,6 +75,7 @@ export function SkillDetailView({ skill, isLoading, isError, error, refetch, tab
           <div style={s.body}>
             {/* Remount when the body version changes (save, restore) so the form starts from it. */}
             {tab === "config" && <ConfigTab key={skill.version} skill={skill} />}
+            {tab === "context" && <ContextTab skill={skill} />}
             {tab === "preview" && <PreviewTab skill={skill} />}
             {tab === "versioning" && <VersioningTab skill={skill} />}
           </div>

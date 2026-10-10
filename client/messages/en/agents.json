@@ -47,6 +47,7 @@
     "tabs": {
       "config": "Config",
       "skills": "Skills",
+      "context": "Context",
       "evals": "Evals",
       "stats": "Stats",
       "ci": "CI"
@@ -116,5 +117,20 @@
     "confirm": "Delete",
     "cancel": "Cancel",
     "deleted": "Deleted \"{name}\""
+  },
+  "context": {
+    "title": "Project context",
+    "counter": "{attached} of {total} attached",
+    "hint": "Order matters — earlier docs appear earlier in the assembled ## Project context block. Tick a document to attach it.",
+    "loadError": "Couldn’t load project context",
+    "saveError": "Couldn’t save project context",
+    "footer": "≈ {tokens} tokens per LLM call",
+    "breakdown": "## Project context: {context} · ## Project specifications (from skills): {specs}",
+    "untrustedNote": "Injected as untrusted blocks into every run.",
+    "warningTitle": "These documents will be skipped at run time (over budget):",
+    "section": {
+      "project_context": "Project context",
+      "project_specifications": "Project specifications"
+    }
   }
 }

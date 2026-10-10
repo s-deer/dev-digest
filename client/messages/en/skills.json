@@ -100,6 +100,7 @@
     },
     "tabs": {
       "config": "Config",
+      "context": "Context",
       "preview": "Preview",
       "versioning": "Versions"
     },
@@ -130,5 +131,16 @@
     "restoreConfirm": "Restore",
     "restored": "Restored v{version} as v{next}",
     "loadError": "Could not load versions."
+  },
+  "context": {
+    "title": "Project context to use",
+    "counter": "{count} attached",
+    "note": "Any agent using this skill inherits these documents.",
+    "tokens": "≈ {tokens} tokens",
+    "serializesAs": "Serializes as",
+    "heading": "## Project specifications",
+    "loadError": "Couldn’t load project context",
+    "saveError": "Couldn’t save project context",
+    "warningTitle": "These documents will be skipped at run time (over budget):"
   }
 }
