@@ -9,6 +9,10 @@ lifecycle it plugs into is in
 [`run-lifecycle-and-cost.md`](run-lifecycle-and-cost.md). Module code lives in
 `src/modules/intent/{constants,domain,prompt,repository,helpers,service,routes}.ts`.
 
+> Project Context docs (hand-attached to agents/skills) are separate from the
+> plan/spec refs gathered here; the run trace's `specs_read` lists both. See
+> [`project-context.md`](project-context.md).
+
 ## Data sources and caps
 
 `IntentService.ensure` (`src/modules/intent/service.ts:73`) gathers evidence

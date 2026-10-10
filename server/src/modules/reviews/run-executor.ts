@@ -2,13 +2,14 @@ import type { Container } from '../../platform/container.js';
 import type {
   PrIntent,
   PrIntentRecord,
+  ProjectContextRecord,
   PromptSkillBlock,
   Provider,
   Review,
   RunTrace,
   UnifiedDiff,
 } from '@devdigest/shared';
-import { reviewPullRequest, countBlockers, renderSkillBlock } from '@devdigest/reviewer-core';
+import { reviewPullRequest, countBlockers, renderSkillBlock, type ProjectDocInput } from '@devdigest/reviewer-core';
 import { RunLogger } from '../../platform/run-logger.js';
 import * as schema from '../../db/schema.js';
 import type { AgentRow } from '../../db/rows.js';
@@ -55,6 +56,38 @@ export interface IntentDeriver {
   ): Promise<{ record: PrIntentRecord; prBody: string | null; cached: boolean; sourcesSummary: string }>;
 }
 
+/**
+ * What one run injects from attached project documents (content-free except the doc bodies handed to the engine).
+ * Deliberately narrower copy of `ResolvedProjectContext` in `modules/project-context/service.ts` (no `injectedPaths`);
+ * keep the shared fields in sync. Drift is caught at compile time where `ReviewService` passes
+ * `container.projectContextService` into this executor.
+ */
+export interface ResolvedProjectContext {
+  contextDocs: ProjectDocInput[];
+  specsDocs: ProjectDocInput[];
+  records: ProjectContextRecord[];
+  /** Trace `specs_read`: injected paths in prompt order, then the Intent Layer refs passed in. */
+  specsRead: string[];
+  tokens: { context: number; specs: number };
+}
+
+/**
+ * Narrow port for Project Context resolution — declared locally so this module
+ * doesn't depend on `modules/project-context`; `Container['projectContextService']`
+ * satisfies it structurally. Never throws (degrades to "no docs").
+ */
+export interface ProjectContextResolver {
+  resolveForRun(input: {
+    workspaceId: string;
+    repoId: string;
+    owner: string;
+    name: string;
+    agentId: string;
+    skills: { skillId: string; name: string }[];
+    intentRefs?: readonly string[];
+  }): Promise<ResolvedProjectContext>;
+}
+
 /** Strips the record-only fields (`pr_id`, `head_sha`, `stale`, `provider`, `model`, token/cost accounting, `updated_at`) down to the `PrIntent` shape reviewer-core expects. */
 function toPrIntent(record: PrIntentRecord): PrIntent {
   const { intent, in_scope, out_of_scope, change_type, confidence, confidence_score, sources, missing_docs } =
@@ -74,6 +107,7 @@ export class ReviewRunExecutor {
     private repo: ReviewRepository,
     private agents: Container['agentsRepo'],
     private intent: IntentDeriver,
+    private projectContext: ProjectContextResolver,
   ) {}
 
   /**
@@ -237,6 +271,14 @@ export class ReviewRunExecutor {
 
     runLog.info(`Starting review with agent "${agent.name}" (${agent.provider}/${agent.model})`);
 
+    // Plan/spec doc refs actually fetched into the intent derivation (Intent
+    // Layer / L03); empty when intent was skipped or none matched.
+    const intentRefs = intent
+      ? intent.sources.filter((s) => (s.kind === 'plan' || s.kind === 'spec') && s.fetched).map((s) => s.ref)
+      : [];
+    // Set once attached docs are resolved; a later failure/cancel still records what was read (AC-52).
+    let resolved: ResolvedProjectContext | null = null;
+
     try {
       // Resolve the agent's LLM provider. (container.llm throws if the provider
       // key is missing — caught below and persisted as a failed run.)
@@ -289,6 +331,20 @@ export class ReviewRunExecutor {
         runLog.info(`skill[${block.order}]: ${block.name} v${block.version} (+${block.tokens} token(s))`);
       }
 
+      // Attached repository docs (Project Context): agent docs -> `## Project
+      // context`, skill docs -> `## Project specifications`. Read from the
+      // default-branch sha, never the PR head; never throws.
+      resolved = await this.projectContext.resolveForRun({
+        workspaceId,
+        repoId: pull.repoId,
+        owner: repo.owner,
+        name: repo.name,
+        agentId: agent.id,
+        skills: skillBlocks.map((b) => ({ skillId: b.skill_id, name: b.name })),
+        intentRefs,
+      });
+      this.logProjectContext(runLog, resolved);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -316,6 +372,10 @@ export class ReviewRunExecutor {
         // instance for every agent in this batch. Omitted when derivation
         // failed (executor already logged "intent: skipped" and continues).
         ...(intent ? { intent } : {}),
+        // Attached project docs — omitted when empty so an agent without
+        // attachments keeps a byte-identical prompt (AC-33).
+        ...(resolved.contextDocs.length > 0 ? { projectContext: resolved.contextDocs } : {}),
+        ...(resolved.specsDocs.length > 0 ? { projectSpecs: resolved.specsDocs } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -393,11 +453,10 @@ export class ReviewRunExecutor {
         })),
         raw_output: outcome.raw,
         memory_pulled: [],
-        // Plan/spec doc refs actually fetched into the intent derivation above
-        // (Intent Layer / L03); empty when intent was skipped or none matched.
-        specs_read: intent
-          ? intent.sources.filter((s) => (s.kind === 'plan' || s.kind === 'spec') && s.fetched).map((s) => s.ref)
-          : [],
+        // Injected project docs in prompt order, then the Intent Layer plan/spec
+        // refs fetched above (deduped).
+        specs_read: resolved.specsRead,
+        project_context: resolved.records,
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
@@ -427,11 +486,44 @@ export class ReviewRunExecutor {
         })
         .catch(() => undefined);
       await this.repo
-        .saveRunTrace(runId, this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start))
+        .saveRunTrace(runId, this.traceFromBuffer(runId, pull, agent, '0/0 passed', Date.now() - start, resolved))
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
     }
+  }
+
+  /**
+   * Live Log lines for Project Context: a summary per section and one line per
+   * injected/skipped doc (AC-42), plus exactly ONE structured summary line per
+   * run — the only one carrying `data`, so the pino mirror gets a single
+   * record (NFR-9). Paths, counts, tokens and reasons only — never document
+   * text (NFR-2).
+   */
+  private logProjectContext(runLog: RunLogger, resolved: ResolvedProjectContext): void {
+    if (resolved.records.length === 0) return;
+    const sections = [
+      { section: 'project_context', label: 'project context', tokens: resolved.tokens.context },
+      { section: 'project_specifications', label: 'project specifications', tokens: resolved.tokens.specs },
+    ] as const;
+    const summary: Record<string, { attached: number; injected: number; skipped: number; tokens: number }> = {};
+    const skipReasons: Record<string, number> = {};
+    for (const { section, label, tokens } of sections) {
+      const records = resolved.records.filter((r) => r.section === section);
+      if (records.length === 0) continue;
+      const injected = records.filter((r) => r.status === 'injected');
+      for (const r of records) if (r.reason) skipReasons[r.reason] = (skipReasons[r.reason] ?? 0) + 1;
+      summary[section] = { attached: records.length, injected: injected.length, skipped: records.length - injected.length, tokens };
+      runLog.info(`${label}: ${injected.length} injected (+${tokens} token(s))`);
+      for (const r of records) {
+        runLog.info(
+          r.status === 'injected'
+            ? `${label}[${r.order}]: ${r.path} (+${r.tokens} token(s))`
+            : `${label}[${r.order}]: ${r.path} skipped — ${r.reason}`,
+        );
+      }
+    }
+    runLog.info('project context summary', { event: 'project_context_summary', sections: summary, skipReasons });
   }
 
   /**
@@ -532,6 +624,7 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     grounding: string,
     durationMs = 0,
+    resolved: ResolvedProjectContext | null = null,
   ): RunTrace {
     return {
       config: {
@@ -550,12 +643,17 @@ export class ReviewRunExecutor {
         skill_blocks: [],
         memory: null,
         specs: null,
+        project_specs: null,
+        project_context_tokens: 0,
+        project_specs_tokens: 0,
         user: '',
       },
       tool_calls: [],
       raw_output: '',
       memory_pulled: [],
-      specs_read: [],
+      // Filled only when resolution ran before the failure/cancel (AC-52).
+      specs_read: resolved?.specsRead ?? [],
+      project_context: resolved?.records ?? [],
       log: this.container.runBus.buffer(runId).map((e) => ({ t: e.t, kind: e.kind, msg: e.msg })),
     };
   }

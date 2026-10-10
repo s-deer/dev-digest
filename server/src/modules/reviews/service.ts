@@ -39,7 +39,7 @@ export class ReviewService {
   constructor(private container: Container) {
     this.repo = new ReviewRepository(container.db);
     this.agents = container.agentsRepo;
-    this.executor = new ReviewRunExecutor(container, this.repo, this.agents, container.intentService);
+    this.executor = new ReviewRunExecutor(container, this.repo, this.agents, container.intentService, container.projectContextService);
     this.startRunUseCase = new StartRunUseCase<AgentRow>({
       pulls: { getPullByNumber: (ws, repoId, n) => this.repo.getPullByNumber(ws, repoId, n) },
       runs: { findRunningRun: (ws, prId, agentId) => this.repo.findRunningRun(ws, prId, agentId) },

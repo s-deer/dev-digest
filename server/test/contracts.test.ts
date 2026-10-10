@@ -18,6 +18,8 @@ import {
   PrIntentRecord,
   PromptAssembly,
   GenerateIntentBody,
+  SetProjectContextBody,
+  ProjectContextRecord,
 } from '@devdigest/shared';
 
 /**
@@ -265,5 +267,47 @@ describe('platform DTOs', () => {
         commits: [],
       }),
     ).not.toThrow();
+  });
+});
+
+describe('Project Context contracts', () => {
+  const baseTrace = {
+    config: { agent: 'A', model: 'm' },
+    stats: { duration_ms: 1, tokens_in: 0, tokens_out: 0, findings: 0, grounding: '0/0' },
+    prompt_assembly: { system: 's', user: 'u' },
+    tool_calls: [],
+    raw_output: '',
+    memory_pulled: [],
+    specs_read: [],
+    log: [],
+  };
+
+  it('an older trace (no project-context fields) parses to defaults', () => {
+    const trace = RunTrace.parse(baseTrace);
+    expect(trace.project_context).toEqual([]);
+    expect(trace.prompt_assembly.project_specs).toBeUndefined();
+    expect(trace.prompt_assembly.project_context_tokens).toBe(0);
+    expect(trace.prompt_assembly.project_specs_tokens).toBe(0);
+  });
+
+  it('parses a trace with injected and skipped records', () => {
+    const trace = RunTrace.parse({
+      ...baseTrace,
+      project_context: [
+        { path: 'docs/a.md', section: 'project_context', source: 'agent', order: 0, tokens: 12, status: 'injected' },
+        { path: 'docs/b.md', section: 'project_specifications', source: 'skill-x', order: 1, tokens: 0, status: 'skipped', reason: 'missing' },
+      ],
+    });
+    expect(trace.project_context).toHaveLength(2);
+    expect(() => ProjectContextRecord.parse({ ...trace.project_context[0], reason: 'nope' })).toThrow();
+  });
+
+  it('SetProjectContextBody rejects duplicate paths and more than 50 paths', () => {
+    const repo_id = '00000000-0000-4000-8000-000000000001';
+    expect(SetProjectContextBody.safeParse({ repo_id, paths: ['docs/a.md', 'docs/b.md'] }).success).toBe(true);
+    expect(SetProjectContextBody.safeParse({ repo_id, paths: ['docs/a.md', 'docs/a.md'] }).success).toBe(false);
+    const many = Array.from({ length: 51 }, (_, i) => `docs/${i}.md`);
+    expect(SetProjectContextBody.safeParse({ repo_id, paths: many }).success).toBe(false);
+    expect(SetProjectContextBody.safeParse({ repo_id, paths: many.slice(0, 50) }).success).toBe(true);
   });
 });

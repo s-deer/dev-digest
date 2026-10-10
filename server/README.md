@@ -74,6 +74,9 @@ flowchart TB
     smartDiff["smart-diff<br/>/pulls/:id/smart-diff (GET)"]
     blast["blast<br/>/pulls/:id/blast (GET)"]
   end
+  subgraph Context["Project Context"]
+    projectContext["project-context<br/>/repos/:id/project-context (GET) · /repos/:id/project-context/document?path= (GET)<br/>/agents/:id/project-context · /skills/:id/project-context (GET · PUT, repo_id)"]
+  end
    subgraph Agents["Agents"]
     agents["agents<br/>/agents · /agents/:id"]
     skills["skills<br/>/skills · /skills/:id · /skills/:id/versions<br/>/skills/:id/versions/:v/restore · /skills/import-preview<br/>/agents/:id/skills"]
@@ -97,6 +100,7 @@ flowchart TB
 | `DATABASE_URL` | `postgres://devdigest:devdigest@localhost:5432/devdigest` | required to migrate/serve |
 | `API_PORT` / `API_HOST` / `WEB_PORT` | `3001` / `127.0.0.1` / `3000` | API bind; `WEB_PORT` also sets the allowed CORS origin |
 | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `OPENROUTER_API_KEY` | — | optional, per-provider; also settable via Settings UI |
+| `PROJECT_CONTEXT_PATTERNS` | `**/{specs,docs,insights}/**/*.md` | Project Context discovery globs, `;`-separated; applies to every repo |
 | `GITHUB_TOKEN` | — | optional; PAT with repo scope (`GITHUB_PAT` accepted as a fallback) |
 | `EMBEDDINGS_ENABLED` | `false` | memory/RAG embeddings (OpenAI); off → **zero** OpenAI calls |
 | `REPO_INTEL_ENABLED` | `true` | repo skeleton + callers in the prompt; `false` → ripgrep-only |

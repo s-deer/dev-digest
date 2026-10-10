@@ -22,6 +22,7 @@ import type {
   UnifiedDiff,
   BlameLine,
   GitCommit,
+  TreeEntry,
   CodeIndex,
   CodeMatch,
   CodeSymbol,
@@ -276,6 +277,8 @@ export interface MockGitOptions {
   syncedHead?: string;
   /** Fixtures for `readFileAt`, keyed `${ref}:${path}`. A missing key throws (mirrors `git show` on a missing blob). */
   filesAt?: Record<string, string>;
+  /** Fixture for `listTree` (any ref). Defaults to an empty tree. */
+  tree?: TreeEntry[];
 }
 
 export class MockGitClient implements GitClient {
@@ -325,6 +328,9 @@ export class MockGitClient implements GitClient {
     const content = this.opts.filesAt?.[key];
     if (content == null) throw new Error(`MockGitClient.readFileAt: no fixture for "${key}"`);
     return content;
+  }
+  async listTree(): Promise<TreeEntry[]> {
+    return this.opts.tree ?? [];
   }
 }
 

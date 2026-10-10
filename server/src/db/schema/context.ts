@@ -9,9 +9,14 @@ import {
   vector,
   index,
   uniqueIndex,
+  check,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { now } from './_shared';
 import { workspaces } from './core';
 import { repos } from './repos';
+import { agents } from './agents';
+import { skills } from './skills';
 
 // ============================================================ Context & codebase
 
@@ -124,3 +129,48 @@ export const onboarding = pgTable('onboarding', {
   json: jsonb('json').notNull(),
   generatedAt: timestamp('generated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+/**
+ * `project_context_attachments` — repository docs attached BY HAND to an agent
+ * (`## Project context`) or a skill (`## Project specifications`), per repo.
+ *
+ * Exactly one owner column is set and matches `owner_kind`. Real FKs to
+ * agents/skills give the cascades (deleting an owner or a repo removes its
+ * rows). Lives in its own table so a save never touches agent/skill versions.
+ * `position` is the 0-based prompt order within (owner, repo).
+ */
+export const projectContextAttachments = pgTable(
+  'project_context_attachments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    repoId: uuid('repo_id')
+      .notNull()
+      .references(() => repos.id, { onDelete: 'cascade' }),
+    ownerKind: text('owner_kind', { enum: ['agent', 'skill'] }).notNull(),
+    agentId: uuid('agent_id').references(() => agents.id, { onDelete: 'cascade' }),
+    skillId: uuid('skill_id').references(() => skills.id, { onDelete: 'cascade' }),
+    path: text('path').notNull(),
+    position: integer('position').notNull(),
+    createdAt: now(),
+  },
+  (t) => ({
+    ownerCheck: check(
+      'project_context_attachments_owner_check',
+      sql`(${t.ownerKind} = 'agent' and ${t.agentId} is not null and ${t.skillId} is null)
+        or (${t.ownerKind} = 'skill' and ${t.skillId} is not null and ${t.agentId} is null)`,
+    ),
+    agentPathUq: uniqueIndex('project_context_attachments_agent_path_uq')
+      .on(t.agentId, t.repoId, t.path)
+      .where(sql`${t.agentId} is not null`),
+    skillPathUq: uniqueIndex('project_context_attachments_skill_path_uq')
+      .on(t.skillId, t.repoId, t.path)
+      .where(sql`${t.skillId} is not null`),
+    agentPosIdx: index('project_context_attachments_agent_pos_idx').on(t.agentId, t.repoId, t.position),
+    skillPosIdx: index('project_context_attachments_skill_pos_idx').on(t.skillId, t.repoId, t.position),
+    repoIdx: index('project_context_attachments_repo_idx').on(t.repoId),
+    workspaceIdx: index('project_context_attachments_workspace_idx').on(t.workspaceId),
+  }),
+);
