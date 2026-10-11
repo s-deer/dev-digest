@@ -1,23 +1,36 @@
-/* BriefCard — the generated PR Brief (L05) on the Overview tab: summary,
-   risk areas and review focus, stored per head SHA. Reading never calls the
-   model; "Generate"/"Refresh" does. A stored brief is never hidden by an
-   error — it stays visible with an inline retry line. */
+/* BriefCard — the generated PR Brief (L05) block on the Overview tab: banner,
+   Intent + Risk areas / Blast radius grid, Review focus and notes. Reading
+   never calls the model; "Generate"/refresh does. A stored brief is never
+   hidden by an error — it stays visible with an inline retry row. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Badge, Button, Card, ErrorState, Icon, Skeleton } from "@devdigest/ui";
+import { Button, ErrorState, Icon } from "@devdigest/ui";
+import type { ReviewRecord } from "@devdigest/shared";
 import { usePrBrief, useGenerateBrief } from "@/lib/hooks/brief";
-import { FocusList } from "./_components/FocusList";
+import { BriefBanner } from "./_components/BriefBanner";
+import { BriefEmpty } from "./_components/BriefEmpty";
+import { BriefGrid } from "./_components/BriefGrid";
+import { BriefSkeleton } from "./_components/BriefSkeleton";
+import { ReviewFocusBlock } from "./_components/ReviewFocusBlock";
 import { RiskList } from "./_components/RiskList";
-import { hasRemovedItems, missingFactKeys } from "./helpers";
+import { hasRemovedItems, missingFactKeys, pickVerdictReview } from "./helpers";
 import { s } from "./styles";
 
 export function BriefCard({
   prId,
+  repoId,
+  repoFullName,
+  headSha,
+  reviews,
   onOpenFile,
 }: {
   prId: string | null;
+  repoId: string;
+  repoFullName: string | null;
+  headSha: string | null;
+  reviews?: ReviewRecord[] | null;
   onOpenFile: (file: string, line: number | null) => void;
 }) {
   const t = useTranslations("brief");
@@ -27,95 +40,72 @@ export function BriefCard({
   const generate = useGenerateBrief(prId);
   const brief = data?.brief ?? null;
   const regenerate = () => generate.mutate();
+  const grid = { prId, repoId, repoFullName, headSha };
 
   const content = (() => {
-    if (!prId || isLoading || generate.isPending) {
+    if (!prId || isLoading || (generate.isPending && !brief)) return <BriefSkeleton />;
+
+    if (!brief) {
       return (
-        <Card>
-          {generate.isPending && (
-            <div style={s.headerRow}>
-              <span />
-              <Button kind="secondary" size="sm" icon="RefreshCw" loading disabled>
-                {brief ? t("brief.refresh") : t("brief.generate")}
-              </Button>
-            </div>
+        <div style={s.stack}>
+          {isError ? (
+            <ErrorState body={t("brief.loadError")} onRetry={() => refetch()} />
+          ) : generate.isError ? (
+            <ErrorState body={t("brief.generateError")} onRetry={regenerate} />
+          ) : (
+            <BriefEmpty onGenerate={regenerate} />
           )}
-          <Skeleton height={13} width="30%" style={{ marginBottom: 14 }} />
-          <Skeleton height={10} width="95%" style={{ marginBottom: 9 }} />
-          <Skeleton height={10} width="80%" style={{ marginBottom: 9 }} />
-          <Skeleton height={10} width="60%" />
-        </Card>
+          <BriefGrid {...grid} />
+        </div>
       );
     }
 
-    if (!brief) {
-      if (isError) return <ErrorState body={t("brief.loadError")} onRetry={() => refetch()} />;
-      if (generate.isError) return <ErrorState body={t("brief.generateError")} onRetry={regenerate} />;
+    const review = pickVerdictReview(reviews);
+    const banner = (
+      <BriefBanner
+        brief={brief}
+        stale={!!data?.stale}
+        review={review}
+        generating={generate.isPending}
+        onRefresh={regenerate}
+      />
+    );
+    if (generate.isPending) {
       return (
-        <Card style={s.emptyCard}>
-          <div style={s.emptyBody}>
-            <div style={s.emptyTitle}>{t("brief.emptyTitle")}</div>
-            <p style={s.emptyText}>{t("brief.emptyBody")}</p>
-            <Button kind="primary" icon="FileText" onClick={regenerate}>
-              {t("brief.generate")}
-            </Button>
-          </div>
-        </Card>
+        <div style={s.stack}>
+          {banner}
+          <BriefSkeleton />
+        </div>
       );
     }
 
     const missing = missingFactKeys(brief.facts);
     const errorText = generate.isError ? t("brief.generateError") : isError ? t("brief.loadError") : null;
     return (
-      <Card>
-        <div style={s.stack}>
-          <div style={s.headerRow}>
-            {data?.stale ? (
-              <Badge icon="AlertTriangle" color="var(--warn)" bg="var(--warn-bg)">
-                {t("brief.outdated")}
-              </Badge>
-            ) : (
-              <span />
-            )}
-            <div style={s.headerActions}>
-              <Button kind="secondary" size="sm" icon="RefreshCw" onClick={regenerate}>
-                {t("brief.refresh")}
-              </Button>
-            </div>
+      <div style={s.stack}>
+        {banner}
+        {errorText && (
+          <div role="alert" style={s.inlineError}>
+            <span>{errorText}</span>
+            <Button kind="secondary" size="sm" icon="RefreshCw" onClick={generate.isError ? regenerate : () => refetch()}>
+              {t("brief.retry")}
+            </Button>
           </div>
-          {errorText && (
-            <div role="alert" style={s.inlineError}>
-              <span>{errorText}</span>
-              <Button kind="secondary" size="sm" icon="RefreshCw" onClick={generate.isError ? regenerate : () => refetch()}>
-                {t("brief.retry")}
-              </Button>
-            </div>
-          )}
-          <div>
-            <div style={s.subTitle}>{t("brief.summary")}</div>
-            <p style={s.summary}>{brief.summary}</p>
-          </div>
-          <div>
-            <div style={s.subTitle}>{t("brief.risksTitle")}</div>
-            <RiskList risks={brief.risks} onOpenFile={onOpenFile} />
-          </div>
-          <div>
-            <div style={s.subTitle}>{t("brief.focusTitle")}</div>
-            <FocusList items={brief.review_focus} onOpenFile={onOpenFile} />
-          </div>
-          {hasRemovedItems(brief.grounding) && (
-            <p style={s.note}>
-              <Icon.Info size={12} aria-hidden="true" />{" "}
-              {t("brief.removedNote", { risks: brief.grounding.risks_dropped, focus: brief.grounding.focus_dropped })}
-            </p>
-          )}
-          {missing.length > 0 && (
-            <p style={s.note}>
-              {t("brief.generatedWithout", { facts: missing.map((k) => t(`brief.fact.${k}`)).join(", ") })}
-            </p>
-          )}
-        </div>
-      </Card>
+        )}
+        <BriefGrid {...grid} riskSlot={<RiskList risks={brief.risks} onOpenFile={onOpenFile} />} />
+        <ReviewFocusBlock items={brief.review_focus} onOpenFile={onOpenFile} />
+        {hasRemovedItems(brief.grounding) && (
+          <p style={s.note}>
+            <Icon.Info size={12} aria-hidden="true" />{" "}
+            {t("brief.removedNote", { risks: brief.grounding.risks_dropped, focus: brief.grounding.focus_dropped })}
+          </p>
+        )}
+        {missing.length > 0 && (
+          <p style={s.note}>
+            {t("brief.generatedWithout", { facts: missing.map((k) => t(`brief.fact.${k}`)).join(", ") })}
+          </p>
+        )}
+      </div>
     );
   })();
 

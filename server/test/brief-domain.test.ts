@@ -45,7 +45,14 @@ const callers = [
 function out(partial: Partial<BriefModelOutput>): BriefModelOutput {
   return { summary: 's', risks: [], review_focus: [], ...partial };
 }
-const risk = (file_refs: string[]) => ({ file_refs, explanation: 'e', title: 't', kind: 'k', severity: 'low' as const });
+const risk = (file_refs: string[], line: number | null = null) => ({
+  file_refs,
+  line,
+  explanation: 'e',
+  title: 't',
+  kind: 'k',
+  severity: 'low' as const,
+});
 
 describe('groundBrief', () => {
   it('drops invented, line-suffixed and absolute paths; a multi-ref risk keeps its grounded refs', () => {
@@ -117,6 +124,55 @@ describe('groundBrief', () => {
       { changed, callers },
     );
     expect(r.review_focus.map((f) => f.reason)).toEqual(['b', 'a']);
+  });
+});
+
+describe('groundBrief risk lines', () => {
+  const g = (risks: ReturnType<typeof risk>[]) => groundBrief(out({ risks }), { changed, callers });
+
+  it('keeps an in-range line and a caller line unchanged and counts nothing', () => {
+    const r = g([risk(['src/a.ts'], 12), risk(['src/a.ts'], 99)]);
+    expect(r.risks.map((x) => x.line)).toEqual([12, 99]);
+    expect(r.grounding).toMatchObject({ risk_lines_snapped: 0, risk_lines_dropped: 0 });
+  });
+
+  it('snaps an out-of-range line to the nearest hunk start (tie: earlier) and counts it', () => {
+    const r = g([risk(['src/a.ts'], 48), risk(['src/a.ts'], 31)]);
+    expect(r.risks.map((x) => x.line)).toEqual([50, 10]);
+    expect(r.grounding.risk_lines_snapped).toBe(2);
+  });
+
+  it('a first ref without hunks snaps to the nearest caller line', () => {
+    const r = g([risk(['docs/readme.md'], 11)]);
+    expect(r.risks[0]!.line).toBe(12);
+    expect(r.grounding).toMatchObject({ risk_lines_snapped: 1, risk_lines_dropped: 0 });
+  });
+
+  it('a first ref with neither hunks nor callers: line null, risk kept, counted as dropped', () => {
+    const r = g([risk(['src/deleted.ts'], 3)]);
+    expect(r.risks).toHaveLength(1);
+    expect(r.risks[0]!.line).toBeNull();
+    expect(r.grounding).toMatchObject({ risk_lines_snapped: 0, risk_lines_dropped: 1 });
+  });
+
+  it('when the first ref was removed the line is null and is not moved to the new first ref', () => {
+    const r = g([risk(['src/invented.ts', 'src/a.ts'], 12)]);
+    expect(r.risks[0]!.file_refs).toEqual(['src/a.ts']);
+    expect(r.risks[0]!.line).toBeNull();
+    expect(r.grounding.risk_lines_dropped).toBe(1);
+  });
+
+  it('a wholly dropped risk does not count its line', () => {
+    const r = g([risk(['src/invented.ts'], 5)]);
+    expect(r.risks).toEqual([]);
+    expect(r.grounding).toMatchObject({ risks_dropped: 1, risk_lines_snapped: 0, risk_lines_dropped: 0 });
+  });
+
+  it('a null line stays null, counts nothing, and every risk has an own line property', () => {
+    const r = g([risk(['src/a.ts'], null), risk(['src/caller.ts'], null)]);
+    expect(r.risks.map((x) => x.line)).toEqual([null, null]);
+    expect(r.grounding).toMatchObject({ risk_lines_snapped: 0, risk_lines_dropped: 0 });
+    for (const x of r.risks) expect(Object.hasOwn(x, 'line')).toBe(true);
   });
 });
 

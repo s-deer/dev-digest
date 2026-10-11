@@ -12,7 +12,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, ErrorState, Skeleton } from "@devdigest/ui";
+import { Card, ErrorState, SectionLabel, Skeleton } from "@devdigest/ui";
 import { blastKey, usePrBlast } from "@/lib/hooks/blast";
 import { useResyncRepoIntel } from "@/lib/hooks/repo-intel";
 import { blastStats } from "./helpers";
@@ -36,6 +36,8 @@ export function BlastRadiusCard({
   headSha?: string | null;
 }) {
   const t = useTranslations("blast");
+  const tBrief = useTranslations("brief");
+  const heading = <SectionLabel icon="Workflow">{tBrief("block.blast")}</SectionLabel>;
   const qc = useQueryClient();
   // Disabled queries stay `isPending` forever, never `isLoading` — gate on
   // `!prId || isLoading`, not `isPending` (client/INSIGHTS.md, 2026-09-26).
@@ -57,6 +59,7 @@ export function BlastRadiusCard({
     if (!prId || isLoading) {
       return (
         <Card>
+          {heading}
           <Skeleton height={13} width="30%" style={{ marginBottom: 16 }} />
           <Skeleton height={60} />
         </Card>
@@ -65,6 +68,7 @@ export function BlastRadiusCard({
     if (isError || !blast) {
       return (
         <Card>
+          {heading}
           <ErrorState body={t("loadError")} onRetry={() => refetch()} />
         </Card>
       );
@@ -72,6 +76,7 @@ export function BlastRadiusCard({
     const counts = blastStats(blast);
     return (
       <Card>
+        {heading}
         {blast.degraded && blast.reason && (
           <DegradedBadge
             reason={blast.reason}

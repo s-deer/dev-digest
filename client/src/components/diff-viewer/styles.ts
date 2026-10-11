@@ -75,11 +75,16 @@ export function chevronFor(open: boolean): CSSProperties {
   };
 }
 
+/** Border of a file card: accent when it is the deep-link target. */
+export function fileCardFor(isTarget: boolean): CSSProperties {
+  return isTarget ? { ...s.fileCard, border: "1px solid var(--accent)" } : s.fileCard;
+}
+
 /** Row background per line kind (add/del tinted, others transparent). No
    border here — a finding's stripe is a separate absolutely-positioned span
    (`sevStripe`) so lines without a finding never shift by the stripe's
    width. */
-export function lineRowFor(kind: Line["kind"], highlighted = false): CSSProperties {
+export function lineRowFor(kind: Line["kind"], highlighted = false, reduced = false): CSSProperties {
   const background = kind === "add" ? "var(--code-add)" : kind === "del" ? "var(--code-del)" : "transparent";
   return {
     display: "flex",
@@ -88,8 +93,20 @@ export function lineRowFor(kind: Line["kind"], highlighted = false): CSSProperti
     lineHeight: "20px",
     background,
     position: "relative",
-    ...(highlighted ? { outline: "2px solid var(--accent)", outlineOffset: -2 } : null),
+    ...(highlighted ? highlightFor(background, reduced) : null),
   };
+}
+
+/** One-time arrival highlight: an accent tint fading to the row's own
+   background (`ddLinePulse`, globals.css) in under 2 s. Under reduced motion
+   the global rule shrinks animations to 0.01 ms, so a keyframe-only highlight
+   would vanish — use a static tint instead. */
+function highlightFor(background: string, reduced: boolean): CSSProperties {
+  if (reduced) return { background: "var(--accent-bg)" };
+  return {
+    ["--dd-line-bg" as string]: background,
+    animation: "ddLinePulse 1.7s ease-out 1 none",
+  } as CSSProperties;
 }
 
 /** The 3px severity stripe, absolutely positioned over the row's left edge —

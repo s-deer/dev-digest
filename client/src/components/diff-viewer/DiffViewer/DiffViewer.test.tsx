@@ -8,7 +8,11 @@ import prReview from "../../../../messages/en/prReview.json";
 import { DiffViewer } from "./DiffViewer";
 import type { DiffFindingsApi } from "../findings";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+  delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+});
 
 // Hunk header @@ -1,3 +1,4 @@ → oldNo/newNo start at 1. Line-by-line:
 //   " ctx before"   → ctx  (old=1, new=1)
@@ -98,5 +102,58 @@ describe("DiffViewer — findings", () => {
     expect(screen.queryByText("Hardcoded secret")).not.toBeInTheDocument();
     expect(screen.queryByText("Missing test")).not.toBeInTheDocument();
     expect(screen.queryByText("Findings outside the diff")).not.toBeInTheDocument();
+  });
+});
+
+describe("DiffViewer — deep-link arrival (AC-77, AC-78)", () => {
+  function renderTarget(opts: { line: number | null; reduced?: boolean; withTarget?: boolean }) {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: !!opts.reduced, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    );
+    render(
+      <NextIntlClientProvider locale="en" messages={{ shell, prReview }}>
+        <DiffViewer
+          files={[FILE_WITH_FINDINGS, FILE_WITHOUT_FINDINGS]}
+          target={opts.withTarget === false ? undefined : { file: FILE_WITH_FINDINGS.path, line: opts.line }}
+        />
+      </NextIntlClientProvider>,
+    );
+    return scroll;
+  }
+  const card = (path: string) => screen.getByText(path).closest("div")!.parentElement as HTMLElement;
+  const row = (n: number) => document.querySelector(`[data-new-line="${n}"]`) as HTMLElement;
+
+  it("accents the target card, scrolls smoothly below the sticky header and pulses the line for under 2 s", () => {
+    const scroll = renderTarget({ line: 2 });
+    expect(card(FILE_WITH_FINDINGS.path).style.border).toBe("1px solid var(--accent)");
+    expect(card(FILE_WITHOUT_FINDINGS.path).style.border).toBe("1px solid var(--border)");
+    expect(scroll).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    expect(row(2).style.scrollMarginTop).toBe("148px");
+    expect(row(2).style.animation).toContain("ddLinePulse 1.7s");
+    expect(row(1).style.animation).toBe("");
+  });
+
+  it("uses auto scroll and a static tint without animation under reduced motion", () => {
+    const scroll = renderTarget({ line: 2, reduced: true });
+    expect(scroll).toHaveBeenCalledWith({ behavior: "auto", block: "start" });
+    expect(row(2).style.animation).toBe("");
+    expect(row(2).style.background).toBe("var(--accent-bg)");
+  });
+
+  it("falls back to the card when the line is not rendered", () => {
+    const scroll = renderTarget({ line: 99 });
+    expect(scroll).toHaveBeenCalledTimes(1);
+    expect(scroll.mock.contexts[0]).toBe(card(FILE_WITH_FINDINGS.path));
+    expect(document.querySelector("[style*='ddLinePulse']")).toBeNull();
+  });
+
+  it("does nothing special without a target", () => {
+    const scroll = renderTarget({ line: null, withTarget: false });
+    expect(scroll).not.toHaveBeenCalled();
+    expect(card(FILE_WITH_FINDINGS.path).style.border).toBe("1px solid var(--border)");
+    expect(document.querySelector("[style*='ddLinePulse']")).toBeNull();
   });
 });

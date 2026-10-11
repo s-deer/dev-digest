@@ -7,6 +7,7 @@
 
 import React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Skeleton, ErrorState } from "@devdigest/ui";
 import { AppShell } from "../../../../../components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
@@ -22,14 +23,18 @@ import { intentKey } from "@/lib/hooks/intent";
 import { smartDiffKey } from "@/lib/hooks/smart-diff";
 import { useActiveRepo, useRepoNotFound } from "../../../../../lib/repo-context";
 import { ApiError } from "../../../../../lib/api";
+import { notify } from "../../../../../lib/toast";
 import { githubPrUrl } from "../../../../../lib/github-urls";
 import type { FindingRecord } from "@devdigest/shared";
+
+const NOT_IN_DIFF_MS = 2600;
 
 export default function PRDetailPage() {
   const params = useParams<{ repoId: string; number: string }>();
   const search = useSearchParams();
   const router = useRouter();
   const { repoId, number } = params;
+  const tBrief = useTranslations("brief");
   const { activeRepo } = useActiveRepo();
   const repoNotFound = useRepoNotFound(repoId);
   // The route is keyed by PR number, but every PR API is keyed by the row's
@@ -81,7 +86,13 @@ export default function PRDetailPage() {
     navigate(sp, "replace");
   };
   // Brief → Files changed: a real history entry, so Back returns to Overview.
+  // A target the PR's diff doesn't contain stays on Overview with a short
+  // notice instead (no URL or history change).
   const openFile = (file: string, line: number | null) => {
+    if (!pr?.files.some((f) => f.path === file)) {
+      notify.warn(tBrief("brief.notInDiff", { file }), { durationMs: NOT_IN_DIFF_MS, key: "not-in-diff" });
+      return;
+    }
     const sp = new URLSearchParams(search.toString());
     sp.set("tab", "diff");
     sp.set("file", file);
@@ -165,6 +176,7 @@ export default function PRDetailPage() {
             repoId={repoId}
             repoFullName={repoFullName}
             headSha={pr.head_sha}
+            reviews={reviews}
             onOpenFile={openFile}
           />
         )}

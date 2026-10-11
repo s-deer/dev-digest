@@ -174,14 +174,28 @@ export type PrBrief = z.infer<typeof PrBrief>;
 // ---- Generated PR Brief (L05) ----
 // Model output schema: field order is observe -> classify (evidence first,
 // verdict last) so the model grounds a risk before it labels it.
+// Strict structured output turns a Zod `.optional()` into a required, non-null
+// property, so nothing reachable from this schema may use `.optional()` or
+// `.nullish()`: `line` is `.nullable()` (the model returns null when no single line applies).
 export const BriefRiskOut = z.object({
   file_refs: z.array(z.string()).min(1),
+  line: z.number().int().min(1).nullable(),
   explanation: z.string(),
   title: z.string(),
   kind: z.string(),
   severity: RiskSeverity,
 });
 export type BriefRiskOut = z.infer<typeof BriefRiskOut>;
+
+/**
+ * Stored/API risk. Read-side only: it is never sent to the model, so `line`
+ * may be `.nullish()` here (briefs stored before revision 2 have no `line`).
+ * `.extend` keeps the key position, so `line` stays right after `file_refs`.
+ */
+export const BriefRiskRecord = BriefRiskOut.extend({
+  line: z.number().int().min(1).nullish(),
+});
+export type BriefRiskRecord = z.infer<typeof BriefRiskRecord>;
 
 export const BriefFocusItem = z.object({
   file: z.string().min(1),
@@ -239,13 +253,16 @@ export const BriefGrounding = z.object({
   risk_refs_removed: z.number().int(),
   focus_dropped: z.number().int(),
   focus_lines_snapped: z.number().int(),
+  // Absent counters (briefs stored before revision 2) mean zero.
+  risk_lines_snapped: z.number().int().optional(),
+  risk_lines_dropped: z.number().int().optional(),
 });
 export type BriefGrounding = z.infer<typeof BriefGrounding>;
 
 /** Stored shape of `pr_brief.json`. */
 export const PrBriefRecord = z.object({
   summary: z.string(),
-  risks: z.array(BriefRiskOut),
+  risks: z.array(BriefRiskRecord),
   review_focus: z.array(BriefFocusItem),
   head_sha: z.string(),
   generated_at: z.string(),

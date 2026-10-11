@@ -21,4 +21,4 @@ export const BRIEF_MAX_TOKENS = 1500;
 export const BRIEF_TEMPERATURE = 0;
 export const BRIEF_TIMEOUT_MS = 60_000;
 export const BRIEF_RATE_LIMIT = { max: 10, timeWindow: '1 minute' } as const;
-export const BRIEF_PROMPT_VERSION = 'brief-v1';
+export const BRIEF_PROMPT_VERSION = 'brief-v2';

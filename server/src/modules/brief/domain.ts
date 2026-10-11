@@ -4,7 +4,7 @@ import type {
   BriefGrounding,
   BriefModelOutput,
   BriefReduction,
-  BriefRiskOut,
+  BriefRiskRecord,
 } from '@devdigest/shared';
 
 /**
@@ -37,7 +37,7 @@ export interface GroundingContext {
 }
 
 export interface GroundedBrief {
-  risks: BriefRiskOut[];
+  risks: BriefRiskRecord[];
   review_focus: BriefFocusItem[];
   grounding: BriefGrounding;
 }
@@ -67,12 +67,49 @@ function distanceToRange(line: number, r: LineRange): number {
 }
 
 /**
+ * Snaps a line onto something the PR contains: kept as is when inside a
+ * changed hunk or on a caller line, else the nearest hunk start (ties: the
+ * earlier hunk), else the nearest caller line (ties: the earlier line).
+ * `null` when the file has neither hunks nor caller lines.
+ */
+function snapLine(
+  file: string,
+  line: number,
+  ctx: GroundingContext,
+): { line: number; snapped: boolean } | null {
+  const ranges = ctx.changed.get(file) ?? [];
+  const fileCallers = ctx.callers.filter((c) => c.file === file).map((c) => c.line);
+  const inRange = ranges.some((r) => line >= r.start && line <= r.end);
+  if (inRange || fileCallers.includes(line)) return { line, snapped: false };
+  if (ranges.length > 0) {
+    let best = ranges[0]!;
+    for (const r of ranges) {
+      if (distanceToRange(line, r) < distanceToRange(line, best)) best = r;
+    }
+    return { line: best.start, snapped: true };
+  }
+  if (fileCallers.length > 0) {
+    let best = fileCallers[0]!;
+    for (const l of fileCallers) {
+      const d = Math.abs(l - line);
+      const bd = Math.abs(best - line);
+      if (d < bd || (d === bd && l < best)) best = l;
+    }
+    return { line: best, snapped: true };
+  }
+  return null;
+}
+
+/**
  * The grounding gate. Keeps only references the PR actually contains:
  * risk refs must be a changed or caller file; focus items must name such a
  * file and a line inside a changed hunk or on a caller line — otherwise the
- * line snaps to the nearest hunk start (or nearest caller line when the file
- * has no hunks), and an item with nothing to snap to is dropped. Model order
- * is preserved. Never throws; an all-ungrounded answer yields empty arrays.
+ * line snaps (see `snapLine`), and an item with nothing to snap to is dropped.
+ * A risk's `line` belongs to the model's FIRST file ref: it is grounded the
+ * same way, but becomes `null` (risk kept) when that ref was removed or the
+ * line cannot be snapped. A stored risk always carries an explicit `line`
+ * (number or null). Model order is preserved. Never throws; an all-ungrounded
+ * answer yields empty arrays.
  */
 export function groundBrief(output: BriefModelOutput, ctx: GroundingContext): GroundedBrief {
   const callerFiles = new Set(ctx.callers.map((c) => c.file));
@@ -80,7 +117,9 @@ export function groundBrief(output: BriefModelOutput, ctx: GroundingContext): Gr
 
   let risksDropped = 0;
   let refsRemoved = 0;
-  const risks: BriefRiskOut[] = [];
+  let riskLinesSnapped = 0;
+  let riskLinesDropped = 0;
+  const risks: BriefRiskRecord[] = [];
   for (const risk of output.risks) {
     const refs = risk.file_refs.filter(isGroundedFile);
     refsRemoved += risk.file_refs.length - refs.length;
@@ -88,7 +127,18 @@ export function groundBrief(output: BriefModelOutput, ctx: GroundingContext): Gr
       risksDropped += 1;
       continue;
     }
-    risks.push({ ...risk, file_refs: refs });
+    let line: number | null = null;
+    if (risk.line !== null) {
+      const firstSurvived = refs[0] === risk.file_refs[0];
+      const snap = firstSurvived ? snapLine(refs[0]!, risk.line, ctx) : null;
+      if (snap) {
+        line = snap.line;
+        if (snap.snapped) riskLinesSnapped += 1;
+      } else {
+        riskLinesDropped += 1;
+      }
+    }
+    risks.push({ ...risk, file_refs: refs, line });
   }
 
   let focusDropped = 0;
@@ -99,35 +149,17 @@ export function groundBrief(output: BriefModelOutput, ctx: GroundingContext): Gr
       focusDropped += 1;
       continue;
     }
-    const ranges = ctx.changed.get(item.file) ?? [];
-    const fileCallers = ctx.callers.filter((c) => c.file === item.file).map((c) => c.line);
-    const inRange = ranges.some((r) => item.line >= r.start && item.line <= r.end);
-    if (inRange || fileCallers.includes(item.line)) {
-      focus.push(item);
-      continue;
-    }
-    let target: number | undefined;
-    if (ranges.length > 0) {
-      let best = ranges[0]!;
-      for (const r of ranges) {
-        if (distanceToRange(item.line, r) < distanceToRange(item.line, best)) best = r;
-      }
-      target = best.start;
-    } else if (fileCallers.length > 0) {
-      let best = fileCallers[0]!;
-      for (const l of fileCallers) {
-        const d = Math.abs(l - item.line);
-        const bd = Math.abs(best - item.line);
-        if (d < bd || (d === bd && l < best)) best = l;
-      }
-      target = best;
-    }
-    if (target === undefined) {
+    const snap = snapLine(item.file, item.line, ctx);
+    if (!snap) {
       focusDropped += 1;
       continue;
     }
-    snapped += 1;
-    focus.push({ ...item, line: target });
+    if (snap.snapped) {
+      snapped += 1;
+      focus.push({ ...item, line: snap.line });
+    } else {
+      focus.push(item);
+    }
   }
 
   return {
@@ -138,6 +170,8 @@ export function groundBrief(output: BriefModelOutput, ctx: GroundingContext): Gr
       risk_refs_removed: refsRemoved,
       focus_dropped: focusDropped,
       focus_lines_snapped: snapped,
+      risk_lines_snapped: riskLinesSnapped,
+      risk_lines_dropped: riskLinesDropped,
     },
   };
 }

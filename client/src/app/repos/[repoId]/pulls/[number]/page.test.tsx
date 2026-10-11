@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import brief from "../../../../../../messages/en/brief.json";
+import { ToastProvider } from "@/lib/toast";
 import PRDetailPage from "./page";
 
 const nav = vi.hoisted(() => ({
@@ -25,7 +28,15 @@ vi.mock("../../../../../lib/repo-context", () => ({
 vi.mock("../../../../../lib/hooks", () => ({
   usePulls: () => ({ data: [{ id: "pr1", number: 7 }], isLoading: false }),
   usePullDetail: () => ({
-    data: { number: 7, head_sha: "abc", body: null, files: [], files_count: 0, commits: [], status: "open" },
+    data: {
+      number: 7,
+      head_sha: "abc",
+      body: null,
+      files: [{ path: "src/a b.ts" }, { path: "src/a.ts" }],
+      files_count: 2,
+      commits: [],
+      status: "open",
+    },
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
@@ -49,6 +60,7 @@ vi.mock("./_components/OverviewTab", () => ({
     <>
       <button onClick={() => onOpenFile("src/a b.ts", 42)}>open with line</button>
       <button onClick={() => onOpenFile("src/a.ts", null)}>open file only</button>
+      <button onClick={() => onOpenFile("src/missing.ts", 3)}>open missing</button>
     </>
   ),
 }));
@@ -66,12 +78,19 @@ beforeEach(() => {
   nav.push.mockReset();
   nav.replace.mockReset();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 function renderPage() {
   return render(
     <QueryClientProvider client={new QueryClient()}>
-      <PRDetailPage />
+      <NextIntlClientProvider locale="en" messages={{ brief }}>
+        <ToastProvider>
+          <PRDetailPage />
+        </ToastProvider>
+      </NextIntlClientProvider>
     </QueryClientProvider>,
   );
 }
@@ -111,5 +130,26 @@ describe("PRDetailPage deep links (AC-52)", () => {
     nav.search = "tab=diff";
     renderPage();
     expect(screen.getByText("no target")).toBeInTheDocument();
+  });
+
+  it("a target outside the PR's files shows one warn notice for 2.6 s and leaves URL and history alone (AC-76, EC-44, EC-50)", () => {
+    vi.useFakeTimers();
+    renderPage();
+    const open = screen.getByRole("button", { name: "open missing" });
+    fireEvent.click(open);
+    expect(nav.push).not.toHaveBeenCalled();
+    expect(nav.replace).not.toHaveBeenCalled();
+    expect(screen.getByText("File not in this PR's diff: src/missing.ts")).toBeInTheDocument();
+
+    // Repeat activations keep a single notice and restart its timer.
+    act(() => void vi.advanceTimersByTime(2000));
+    fireEvent.click(open);
+    fireEvent.click(open);
+    expect(screen.getAllByText("File not in this PR's diff: src/missing.ts")).toHaveLength(1);
+    act(() => void vi.advanceTimersByTime(2000));
+    expect(screen.getByText("File not in this PR's diff: src/missing.ts")).toBeInTheDocument();
+    act(() => void vi.advanceTimersByTime(700));
+    expect(screen.queryByText("File not in this PR's diff: src/missing.ts")).not.toBeInTheDocument();
+    expect(nav.push).not.toHaveBeenCalled();
   });
 });

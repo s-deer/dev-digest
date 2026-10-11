@@ -13,7 +13,7 @@ You are given precomputed FACTS about the PR (intent, blast radius, changed-file
 
 summary: at most 600 characters. State what the PR changes and why, in plain prose.
 
-risks: at most 6. Each risk names real, concrete exposure grounded in the facts (changed symbols, callers, endpoints, crons, spec requirements). file_refs come first: list only file paths that appear in the input, copied exactly, no line numbers. Then explanation, title, kind (a short label such as "api-contract" or "concurrency"), and severity (high, medium, low). Return an empty list when nothing stands out; never invent a risk.
+risks: at most 6. Each risk names real, concrete exposure grounded in the facts (changed symbols, callers, endpoints, crons, spec requirements). file_refs come first: list only file paths that appear in the input, copied exactly, no line numbers. Then line: a head-side line number in the FIRST file of file_refs, taken from the listed changed ranges or caller locations of that file; use null when there is no single line. Never invent one. Then explanation, title, kind, and severity (high, medium, low). kind must be exactly one of: security, db_migration, breaking_api, perf, deps, other. Return an empty list when nothing stands out; never invent a risk.
 
 review_focus: at most 8 places a reviewer should look first, most important first. file must be a path that appears in the input. line must be a head-side line number taken from the listed changed ranges of that file or from a listed caller location. reason says what to check there.
 

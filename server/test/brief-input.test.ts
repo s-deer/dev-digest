@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BRIEF_INPUT_BUDGET, BRIEF_SHARES } from '../src/modules/brief/constants.js';
+import { BriefModelOutput } from '@devdigest/shared';
+import { SYSTEM_PROMPT } from '../src/modules/brief/prompt.js';
 import { buildBriefInput, type BriefInputFacts } from '../src/modules/brief/input.js';
 
 const tokenizer = { count: (t: string) => Math.ceil(t.length / 4) };
@@ -115,5 +117,39 @@ describe('buildBriefInput', () => {
     const r = buildBriefInput({ facts: f, tokenizer });
     if (!r.ok) throw new Error('expected ok');
     expect(r.user).toContain('STALE');
+  });
+});
+
+describe('SYSTEM_PROMPT risk instructions', () => {
+  it('lists exactly the six kinds, the line rule and the null instruction', () => {
+    expect(SYSTEM_PROMPT).toContain('kind must be exactly one of: security, db_migration, breaking_api, perf, deps, other');
+    expect(SYSTEM_PROMPT).toContain('head-side line number in the FIRST file of file_refs');
+    expect(SYSTEM_PROMPT).toContain('use null when there is no single line');
+    expect(SYSTEM_PROMPT).toContain('Never invent one');
+  });
+
+  it('keeps file_refs as bare paths and the field order file_refs, line, explanation, title, kind, severity', () => {
+    expect(SYSTEM_PROMPT).toContain('copied exactly, no line numbers');
+    expect(SYSTEM_PROMPT).not.toMatch(/path:line/);
+    const at = (w: string) => SYSTEM_PROMPT.indexOf(w, SYSTEM_PROMPT.indexOf('risks: at most 6'));
+    expect(at('file_refs')).toBeLessThan(at('line:'));
+    expect(at('line:')).toBeLessThan(at('explanation'));
+    expect(at('explanation')).toBeLessThan(at('title'));
+    expect(at('title')).toBeLessThan(at('severity'));
+  });
+
+  it('system + user stays within the input budget for a typical input', () => {
+    const r = buildBriefInput({ facts: facts(), tokenizer });
+    if (!r.ok) throw new Error('expected ok');
+    expect(tokenizer.count(SYSTEM_PROMPT) + tokenizer.count(r.user)).toBeLessThanOrEqual(BRIEF_INPUT_BUDGET);
+  });
+
+  it('a response with an unlisted kind and a null line still validates', () => {
+    const res = BriefModelOutput.safeParse({
+      summary: 's',
+      review_focus: [],
+      risks: [{ file_refs: ['a.ts'], line: null, explanation: 'e', title: 't', kind: 'api-contract', severity: 'low' }],
+    });
+    expect(res.success).toBe(true);
   });
 });

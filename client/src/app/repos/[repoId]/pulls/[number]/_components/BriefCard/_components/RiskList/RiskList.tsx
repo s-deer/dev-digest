@@ -1,52 +1,60 @@
-/* RiskList — the brief's risk areas. Severity is an icon plus a text label;
-   each file ref is a keyboard-activatable button that deep-links into Files
-   changed. All model text is rendered as plain text nodes. */
+/* RiskList — the brief's risk areas as a wrapping row of pills; one pill's
+   panel is open at a time. Panel text is plain text nodes (no HTML/Markdown);
+   each file ref is a keyboard-activatable button into Files changed. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Icon } from "@devdigest/ui";
-import type { BriefRiskOut } from "@devdigest/shared";
-import { SEVERITY_COLOR } from "../../helpers";
+import type { BriefRiskRecord } from "@devdigest/shared";
+import { RiskPill } from "../RiskPill";
 import { s } from "../../styles";
 
 export function RiskList({
   risks,
   onOpenFile,
 }: {
-  risks: BriefRiskOut[];
+  risks: BriefRiskRecord[];
   onOpenFile: (file: string, line: number | null) => void;
 }) {
   const t = useTranslations("brief");
+  const [open, setOpen] = React.useState<number | null>(null);
+  const baseId = React.useId();
   if (risks.length === 0) return <p style={s.note}>{t("noRisks")}</p>;
+  const openRisk = open != null ? (risks[open] ?? null) : null;
   return (
-    <ul style={s.list}>
-      {risks.map((r, i) => (
-        <li key={`${r.title}:${i}`}>
-          <div style={s.riskTitleRow}>
-            <span style={s.riskTitle}>{r.title}</span>
-            <span style={s.severity(SEVERITY_COLOR[r.severity])}>
-              <Icon.AlertTriangle size={12} aria-hidden="true" />
-              {t(`brief.severity.${r.severity}`)}
-            </span>
-          </div>
-          <p style={s.riskText}>{r.explanation}</p>
+    <div>
+      <div style={s.riskRow}>
+        {risks.map((r, i) => (
+          <RiskPill
+            key={`${r.title}:${i}`}
+            risk={r}
+            open={open === i}
+            panelId={`${baseId}-panel`}
+            onToggle={() => setOpen(open === i ? null : i)}
+            onOpenFile={onOpenFile}
+          />
+        ))}
+      </div>
+      {openRisk && (
+        <div id={`${baseId}-panel`} style={s.riskPanel}>
+          <div style={s.riskPanelLabel}>{t("brief.riskWhy")}</div>
+          <p style={s.riskText}>{openRisk.explanation}</p>
           <div style={s.fileRefs}>
-            {r.file_refs.map((file) => (
+            {openRisk.file_refs.map((file, j) => (
               <button
                 key={file}
                 type="button"
                 className="mono"
                 aria-label={t("brief.riskFileAria", { file })}
                 style={s.linkBtn}
-                onClick={() => onOpenFile(file, null)}
+                onClick={() => onOpenFile(file, j === 0 ? (openRisk.line ?? null) : null)}
               >
                 {file}
               </button>
             ))}
           </div>
-        </li>
-      ))}
-    </ul>
+        </div>
+      )}
+    </div>
   );
 }

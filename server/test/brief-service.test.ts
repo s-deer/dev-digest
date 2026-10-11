@@ -51,8 +51,8 @@ class FakeStore implements BriefStorePort {
 const OUTPUT = {
   summary: 'Adds a rate limiter to protect public endpoints.',
   risks: [
-    { file_refs: ['src/limiter.ts', 'src/invented.ts'], explanation: 'Shared state', title: 'Limiter state', kind: 'concurrency', severity: 'medium' },
-    { file_refs: ['src/invented.ts'], explanation: 'x', title: 'Invented', kind: 'k', severity: 'low' },
+    { file_refs: ['src/limiter.ts', 'src/invented.ts'], line: 500, explanation: 'Shared state', title: 'Limiter state', kind: 'concurrency', severity: 'medium' },
+    { file_refs: ['src/invented.ts'], line: null, explanation: 'x', title: 'Invented', kind: 'k', severity: 'low' },
   ],
   review_focus: [
     { file: 'src/limiter.ts', line: 500, reason: 'out of range line' },
@@ -131,7 +131,13 @@ describe('BriefService', () => {
     expect(brief.risks[0]!.file_refs).toEqual(['src/limiter.ts']);
     // 500 is outside the hunk 10..13 -> snapped to its start
     expect(brief.review_focus).toEqual([{ file: 'src/limiter.ts', line: 10, reason: 'out of range line' }]);
-    expect(brief.grounding).toEqual({ risks_dropped: 1, risk_refs_removed: 2, focus_dropped: 1, focus_lines_snapped: 1 });
+    expect(brief.grounding).toEqual({ risks_dropped: 1, risk_refs_removed: 2, focus_dropped: 1, focus_lines_snapped: 1, risk_lines_snapped: 1, risk_lines_dropped: 0 });
+    // risk line 500 (first ref survived) snaps to the hunk start; the dropped risk's line is not counted
+    expect(brief.risks[0]!.line).toBe(10);
+    // the structured log line carries counters only, never text
+    expect(h.lines[0]!.grounding).toEqual(brief.grounding);
+    expect(JSON.stringify(h.lines[0])).not.toContain('Adds a rate limiter');
+    expect(JSON.stringify(h.lines[0])).not.toContain('Shared state');
     expect(brief.usage).toMatchObject({ tokens_in: 100, tokens_out: 50, cost_usd: 0.001, attempts: 1 });
     expect(brief.usage.input_tokens_total).toBeGreaterThan(0);
     expect(brief.facts).toMatchObject({

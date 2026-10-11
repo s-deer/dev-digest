@@ -23,10 +23,27 @@ const OUTPUT = {
   risks: [
     {
       file_refs: ['src/middleware/ratelimit.ts', 'src/invented.ts'],
+      line: 200,
       explanation: 'Shared bucket state across requests.',
       title: 'Limiter state',
-      kind: 'concurrency',
+      kind: 'perf',
       severity: 'medium',
+    },
+    {
+      file_refs: ['src/api/users.ts'],
+      line: null,
+      explanation: 'No single line.',
+      title: 'Caller exposure',
+      kind: 'other',
+      severity: 'low',
+    },
+    {
+      file_refs: ['src/config.ts'],
+      line: 7,
+      explanation: 'No hunks and no callers to snap to.',
+      title: 'Config',
+      kind: 'other',
+      severity: 'low',
     },
   ],
   review_focus: [
@@ -118,7 +135,14 @@ d('brief routes (Testcontainers pg)', () => {
       ['src/middleware/ratelimit.ts', 40],
       ['src/api/users.ts', 30],
     ]);
-    expect(brief.grounding).toMatchObject({ risk_refs_removed: 1, focus_dropped: 1 });
+    expect(brief.grounding).toMatchObject({
+      risk_refs_removed: 1,
+      focus_dropped: 1,
+      risk_lines_snapped: 1,
+      risk_lines_dropped: 1,
+    });
+    // 200 is outside the hunk 1..84 -> snapped to its start; null stays null; no-ranges/no-callers -> null
+    expect(brief.risks.map((r: { line: number | null }) => r.line)).toEqual([1, null, null]);
     expect(brief.usage.input_tokens_total).toBeGreaterThan(0);
     expect(brief.usage.input_tokens_total).toBeLessThanOrEqual(8000);
 
@@ -195,6 +219,33 @@ d('brief routes (Testcontainers pg)', () => {
       .returning();
     const res = await server.inject({ method: 'POST', url: `/pulls/${empty!.id}/brief` });
     expect(res.statusCode).toBe(422);
+    expect(calls(llm)).toHaveLength(0);
+    await server.close();
+  });
+  it('GET reads a revision-1 record (no risk line, no counters, free-form kind) and a null-line record unchanged', async () => {
+    const db = pg.handle.db;
+    const llm = new MockLLMProvider('openrouter');
+    const server = await appWith(llm);
+    const [current] = await db.select().from(t.prBrief).where(eq(t.prBrief.prId, prId));
+    const base = current!.json as Record<string, unknown>;
+    const rev1 = {
+      ...base,
+      risks: [{ file_refs: ['src/config.ts'], explanation: 'e', title: 't', kind: 'api-contract', severity: 'low' }],
+      grounding: { risks_dropped: 0, risk_refs_removed: 0, focus_dropped: 0, focus_lines_snapped: 0 },
+    };
+    const nullLine = {
+      ...rev1,
+      risks: [{ file_refs: ['src/config.ts'], line: null, explanation: 'e', title: 't', kind: 'other', severity: 'low' }],
+    };
+    for (const stored of [rev1, nullLine]) {
+      await db.update(t.prBrief).set({ json: stored }).where(eq(t.prBrief.prId, prId));
+      const res = await server.inject({ method: 'GET', url: `/pulls/${prId}/brief` });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().brief.risks).toEqual(stored.risks);
+      expect(typeof res.json().stale).toBe('boolean');
+      const [row] = await db.select().from(t.prBrief).where(eq(t.prBrief.prId, prId));
+      expect(row!.json).toEqual(stored);
+    }
     expect(calls(llm)).toHaveLength(0);
     await server.close();
   });

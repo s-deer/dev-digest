@@ -72,3 +72,9 @@ re-discovered the hard way.
 - **Insight:** Both elements' text content equal the same string, so `screen.getByText(label)` throws "multiple elements found" even though only one of them is the visually rendered label the test cares about (the one a caller-link `<a>` wraps).
 - **Do:** Scope the query to the visible element with `screen.getByText(label, { selector: "text" })` (SVG tag name, lowercase) instead of a bare `getByText`.
 - **Evidence:** `client/src/app/repos/[repoId]/pulls/[number]/_components/BlastRadiusCard/_components/BlastGraph/BlastGraph.test.tsx`, `BlastRadiusCard.test.tsx` (graph-toggle test).
+
+### 2026-10-11 · A keyframe-only highlight vanishes under `prefers-reduced-motion`
+- **Context:** `src/vendor/ui/styles.css` has a global reduced-motion rule forcing `animation-duration: 0.01ms !important` on everything.
+- **Insight:** Any cue that exists only as an animation (e.g. the deep-link line pulse) is erased for reduced-motion users, even though the animation is "still applied".
+- **Do:** Give a static fallback (`useReducedMotion()` -> tinted background, no `animation`). Keep keyframes in `src/app/globals.css` (vendor/ui is off limits).
+- **Evidence:** `client/src/components/diff-viewer/styles.ts` (`highlightFor`), `useReducedMotion.ts`, `DiffViewer.test.tsx`.
