@@ -23,7 +23,7 @@ import {
   type SpecRecordLike,
 } from './domain.js';
 import { buildBriefInput, type BriefInputFacts } from './input.js';
-import { BriefModelOutput } from './prompt.js';
+import { BriefModelOutputEnglish } from './prompt.js';
 
 /**
  * BriefService (L05): one bounded model call over precomputed facts, grounded
@@ -235,7 +235,7 @@ export class BriefService {
         try {
           result = await llm.completeStructured({
             model: model.model,
-            schema: BriefModelOutput,
+            schema: BriefModelOutputEnglish,
             schemaName: 'PrBrief',
             messages: [
               { role: 'system', content: built.system },

@@ -1,4 +1,5 @@
 import type { ChatMessage, PrIntent, PromptAssembly, PromptSkillBlock } from '@devdigest/shared';
+import { ENGLISH_ONLY_RULE } from './language.js';
 
 /**
  * Prompt assembly + prompt-injection hardening.
@@ -226,14 +227,14 @@ export function renderProjectDocBlock(doc: Pick<ProjectDocInput, 'path' | 'conte
 
 /**
  * Assemble the messages array + the PromptAssembly record for the run trace.
- * Untrusted blocks (specs, diff) are delimiter-wrapped; the injection guard is
- * appended to the system message.
+ * Untrusted blocks (specs, diff) are delimiter-wrapped; the injection guard and
+ * the English-only rule are appended to the system message.
  */
 export function assemblePrompt(parts: PromptParts): AssembledPrompt {
   const projectContextDocs = parts.projectContext ?? [];
   const projectSpecsDocs = parts.projectSpecs ?? [];
   const hasProjectDocs = projectContextDocs.length > 0 || projectSpecsDocs.length > 0;
-  const system = `${parts.system}\n\n${INJECTION_GUARD}${hasProjectDocs ? PROJECT_DOCS_GUARD : ''}`;
+  const system = `${parts.system}\n\n${INJECTION_GUARD}${hasProjectDocs ? PROJECT_DOCS_GUARD : ''}\n\n${ENGLISH_ONLY_RULE}`;
 
   const skillBlocks = [...(parts.skills ?? [])].sort((a, b) => a.order - b.order);
   const skillsBlock =

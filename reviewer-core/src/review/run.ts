@@ -8,10 +8,21 @@ import type {
   RunEventKind,
   UnifiedDiff,
 } from '@devdigest/shared';
-import { Review as ReviewSchema } from '@devdigest/shared';
+import { Review as ReviewContract } from '@devdigest/shared';
+import { requireEnglish } from '../language.js';
 import { assemblePrompt, type ProjectDocInput } from '../prompt.js';
 import { groundFindings, groundingSummary } from '../grounding.js';
 import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
+
+/** The model's Review, with its prose fields required to be English (reprompts otherwise). */
+const ReviewSchema = requireEnglish(ReviewContract, (r) => [
+  [['summary'], r.summary],
+  ...r.findings.flatMap((f, i) => [
+    [['findings', i, 'title'], f.title] as const,
+    [['findings', i, 'rationale'], f.rationale] as const,
+    [['findings', i, 'suggestion'], f.suggestion] as const,
+  ]),
+]);
 
 /**
  * reviewPullRequest — the review engine entry point.

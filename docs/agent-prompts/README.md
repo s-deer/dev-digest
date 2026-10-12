@@ -21,18 +21,30 @@ in the DB). The canonical, reviewable copies live next to this file:
 Assembly happens in `reviewer-core/src/prompt.ts` (`assemblePrompt`). The model
 receives exactly two messages:
 
-**System message** = your agent prompt **+** a fixed injection guard:
+**System message** = your agent prompt **+** a fixed injection guard **+** a fixed
+English-only rule:
 
 ```
 <your system_prompt>
 
-<INJECTION_GUARD>   // appended verbatim to EVERY agent, every run
+<INJECTION_GUARD>     // appended verbatim to EVERY agent, every run
+
+<ENGLISH_ONLY_RULE>   // appended verbatim to EVERY agent, every run
 ```
 
 `INJECTION_GUARD` (`prompt.ts:16`) tells the model that everything inside
 `<untrusted>…</untrusted>` is data, never instructions, and that claims like "test
 fixture / not for production / ignore this" never descope the review. You do not
 need to repeat any of this in your prompt — it is always there.
+
+`ENGLISH_ONLY_RULE` (`reviewer-core/src/language.ts`) tells the model to write every
+human-readable field in English, whatever language the input uses. It is backed by a
+check: the engine validates `summary` and each finding's `title`, `rationale` and
+`suggestion` with `requireEnglish`, and a field written in a non-Latin script (Chinese,
+Cyrillic, …) fails validation, so the provider reprompts the model to rewrite it. Code
+spans, fenced blocks and `"quoted"` text are ignored by the check. The same rule and
+check cover the PR brief, intent derivation and convention extraction on the server.
+Other Latin-script languages (Spanish, French, …) are covered by the rule only.
 
 **User message** = the task and all context, in this order, each untrusted block
 delimiter-wrapped (`prompt.ts:200-217`):

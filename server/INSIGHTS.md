@@ -13,6 +13,12 @@ re-discovered the hard way.
 - **Do:** ALWAYS order schema fields observe → count → classify → score. NEVER put `category`/`confidence`/`severity` first for readability.
 - **Evidence:** commit `641b637` (`server/src/modules/conventions/prompt.ts`, `docs/specs/conventions.md` §5.2); angular-osf scan with deepseek-v4-flash.
 
+### 2026-10-12 · A `superRefine` on a `completeStructured` schema adds a semantic check that reuses the reprompt loop for free
+- **Context:** deepseek-v4-flash returned a whole review (summary + findings) in Chinese; no prompt pinned the output language.
+- **Insight:** `toJsonSchema` sends a byte-identical JSON Schema for `X.superRefine(...)` and `X`, but `parseWithRepair` runs the refinement, so a failed check becomes a reprompt naming the field path. The refinement runs only after the base schema passes.
+- **Do:** Put output-content rules (e.g. English-only via `requireEnglish` from `platform/language.ts`) on the schema passed to `completeStructured`, never in a post-hoc check. Pick only prose fields: verbatim evidence/snippets may be in any language.
+- **Evidence:** `reviewer-core/src/language.ts`, `reviewer-core/test/language.test.ts`, `server/test/english-only-output.test.ts`; PR #13 re-run (run `12a00520`) came back in English.
+
 ## Decisions
 
 ### 2026-09-19 · Skill activation is an agent attachment concern, not only a global skill flag

@@ -1,4 +1,5 @@
 import { BriefModelOutput } from '@devdigest/shared';
+import { ENGLISH_ONLY_RULE, requireEnglish } from '../../platform/language.js';
 
 /**
  * Structured-output schema for the PR Brief — the shared contract, reused as
@@ -6,6 +7,16 @@ import { BriefModelOutput } from '@devdigest/shared';
  * model must judge go after the fields it observes").
  */
 export { BriefModelOutput };
+
+/** What the model is asked for: `BriefModelOutput` with English-only prose (reprompts otherwise). */
+export const BriefModelOutputEnglish = requireEnglish(BriefModelOutput, (o) => [
+  [['summary'], o.summary],
+  ...o.risks.flatMap((r, i) => [
+    [['risks', i, 'title'], r.title] as const,
+    [['risks', i, 'explanation'], r.explanation] as const,
+  ]),
+  ...o.review_focus.map((f, i) => [['review_focus', i, 'reason'], f.reason] as const),
+]);
 
 export const SYSTEM_PROMPT = `You write a short brief for a pull request reviewer: what the PR changes and why, which areas are risky, and where to look first.
 
@@ -17,6 +28,8 @@ risks: at most 6. Each risk names real, concrete exposure grounded in the facts 
 
 review_focus: at most 8 places a reviewer should look first, most important first. file must be a path that appears in the input. line must be a head-side line number taken from the listed changed ranges of that file or from a listed caller location. reason says what to check there.
 
-Cite only paths and lines that appear in the input.`;
+Cite only paths and lines that appear in the input.
+
+${ENGLISH_ONLY_RULE}`;
 
 export const TASK = 'Write the PR brief from the facts below.';

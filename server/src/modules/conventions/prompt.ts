@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ENGLISH_ONLY_RULE, requireEnglish } from '../../platform/language.js';
 import { MAX_CANDIDATES } from './constants.js';
 
 export const ExtractionSchema = z.object({
@@ -18,6 +19,14 @@ export const ExtractionSchema = z.object({
 
 export type Extraction = z.infer<typeof ExtractionSchema>;
 
+/** English-only prose (reprompts otherwise); `evidence_snippet` is code and stays verbatim. */
+export const ExtractionEnglish = requireEnglish(ExtractionSchema, (o) =>
+  o.candidates.flatMap((c, i) => [
+    [['candidates', i, 'rule'], c.rule] as const,
+    [['candidates', i, 'rationale'], c.rationale] as const,
+  ]),
+);
+
 export const SYSTEM_PROMPT = `You extract this repository's house conventions: specific repeated rules a reviewer should enforce in new code.
 
 You receive a code-selected sample. Files are listed with 1-based line numbers. Cite only files in the sample and copy evidence verbatim.
@@ -27,7 +36,9 @@ Return rules that are specific to this repository and visible in at least two pl
 Do not return universal advice, framework defaults, a single trivial line, or anything without evidence. An ungrounded candidate is discarded by code.
 
 Categories: naming, structure, errors, testing, imports, typing, api, general.
-Count occurrences in the sample before assigning confidence: 0.9+ for explicit or pervasive rules, 0.7-0.9 for repeated rules, 0.5-0.7 for plausible rules seen once or twice. Return at most ${MAX_CANDIDATES} candidates, strongest first.`;
+Count occurrences in the sample before assigning confidence: 0.9+ for explicit or pervasive rules, 0.7-0.9 for repeated rules, 0.5-0.7 for plausible rules seen once or twice. Return at most ${MAX_CANDIDATES} candidates, strongest first.
+
+${ENGLISH_ONLY_RULE}`;
 
 export function buildUserMessage(repoFullName: string, sample: string, paths: string[]): string {
   return [
