@@ -78,3 +78,9 @@ re-discovered the hard way.
 - **Insight:** Any cue that exists only as an animation (e.g. the deep-link line pulse) is erased for reduced-motion users, even though the animation is "still applied".
 - **Do:** Give a static fallback (`useReducedMotion()` -> tinted background, no `animation`). Keep keyframes in `src/app/globals.css` (vendor/ui is off limits).
 - **Evidence:** `client/src/components/diff-viewer/styles.ts` (`highlightFor`), `useReducedMotion.ts`, `DiffViewer.test.tsx`.
+
+### 2026-10-12 · A `1fr 1fr` grid column grows past half width when it holds a `nowrap` mono path
+- **Context:** `BriefGrid` puts Intent + Risk areas and Blast radius side by side; risk pills show `file_refs[0]` with `white-space: nowrap; text-overflow: ellipsis`.
+- **Insight:** A `1fr` track's minimum is `auto` (min-content), so one long unbreakable path widens the column, the grid overflows the banner by ~100px, and the ellipsis never triggers.
+- **Do:** Use `minmax(0, 1fr)` tracks for any grid holding truncated text, plus `minWidth: 0` / `maxWidth: 100%` on the flex children down to the ellipsis span.
+- **Evidence:** `client/src/app/repos/[repoId]/pulls/[number]/_components/BriefCard/styles.ts` (`grid`, `pillRef`).

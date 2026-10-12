@@ -375,6 +375,13 @@ describe("BriefCard", () => {
     expect(toggles[1]).toHaveAttribute("aria-expanded", "true");
     expect(screen.queryByText("<b>x</b> and **y**")).not.toBeInTheDocument();
     expect(screen.getByText("second")).toBeInTheDocument();
+    // the panel unfolds under its own pill, before the next pill
+    const second = toggles[1]!.closest("li")!;
+    expect(second).toContainElement(screen.getByText("second"));
+    expect(document.getElementById(toggles[1]!.getAttribute("aria-controls")!)).toHaveTextContent("second");
+    expect(
+      screen.getByText("second").compareDocumentPosition(toggles[2]!) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     fireEvent.click(toggles[1]!);
     expect(screen.queryByText("second")).not.toBeInTheDocument();
   });

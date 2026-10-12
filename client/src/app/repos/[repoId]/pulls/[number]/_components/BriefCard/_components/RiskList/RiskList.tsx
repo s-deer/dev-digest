@@ -1,6 +1,7 @@
-/* RiskList — the brief's risk areas as a wrapping row of pills; one pill's
-   panel is open at a time. Panel text is plain text nodes (no HTML/Markdown);
-   each file ref is a keyboard-activatable button into Files changed. */
+/* RiskList — the brief's risk areas as a list of pills; the open pill's panel
+   unfolds directly under that pill, and one panel is open at a time. Panel
+   text is plain text nodes (no HTML/Markdown); each file ref is a
+   keyboard-activatable button into Files changed. */
 "use client";
 
 import React from "react";
@@ -20,41 +21,41 @@ export function RiskList({
   const [open, setOpen] = React.useState<number | null>(null);
   const baseId = React.useId();
   if (risks.length === 0) return <p style={s.note}>{t("noRisks")}</p>;
-  const openRisk = open != null ? (risks[open] ?? null) : null;
   return (
-    <div>
-      <div style={s.riskRow}>
-        {risks.map((r, i) => (
-          <RiskPill
-            key={`${r.title}:${i}`}
-            risk={r}
-            open={open === i}
-            panelId={`${baseId}-panel`}
-            onToggle={() => setOpen(open === i ? null : i)}
-            onOpenFile={onOpenFile}
-          />
-        ))}
-      </div>
-      {openRisk && (
-        <div id={`${baseId}-panel`} style={s.riskPanel}>
-          <div style={s.riskPanelLabel}>{t("brief.riskWhy")}</div>
-          <p style={s.riskText}>{openRisk.explanation}</p>
-          <div style={s.fileRefs}>
-            {openRisk.file_refs.map((file, j) => (
-              <button
-                key={file}
-                type="button"
-                className="mono"
-                aria-label={t("brief.riskFileAria", { file })}
-                style={s.linkBtn}
-                onClick={() => onOpenFile(file, j === 0 ? (openRisk.line ?? null) : null)}
-              >
-                {file}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    <ul style={s.riskList}>
+      {risks.map((r, i) => {
+        const panelId = `${baseId}-panel-${i}`;
+        return (
+          <li key={`${r.title}:${i}`} style={s.riskItem}>
+            <RiskPill
+              risk={r}
+              open={open === i}
+              panelId={panelId}
+              onToggle={() => setOpen(open === i ? null : i)}
+              onOpenFile={onOpenFile}
+            />
+            {open === i && (
+              <div id={panelId} style={s.riskPanel}>
+                <p style={s.riskText}>{r.explanation}</p>
+                <div style={s.fileRefs}>
+                  {r.file_refs.map((file, j) => (
+                    <button
+                      key={file}
+                      type="button"
+                      className="mono"
+                      aria-label={t("brief.riskFileAria", { file })}
+                      style={s.linkBtn}
+                      onClick={() => onOpenFile(file, j === 0 ? (r.line ?? null) : null)}
+                    >
+                      {file}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
