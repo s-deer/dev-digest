@@ -23,6 +23,14 @@ export {
   type AssembledPrompt,
 } from './prompt.js';
 
+// English-only output: the system-prompt rule + a prose-field schema refinement.
+export {
+  ENGLISH_ONLY_RULE,
+  isNonEnglishProse,
+  requireEnglish,
+  type ProseField,
+} from './language.js';
+
 // Citation grounding — the mandatory mechanical gate for diff findings.
 export { groundFindings, groundingSummary, type GroundingResult } from './grounding.js';
 

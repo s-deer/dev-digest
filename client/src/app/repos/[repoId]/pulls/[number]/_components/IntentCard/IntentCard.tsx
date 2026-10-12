@@ -1,18 +1,16 @@
-/* IntentCard — Intent Layer (L03) card for the Overview tab's "PR Brief"
-   section. Owns the whole "PR Brief" grid: loading and empty states replace
-   it full width (DevDigest-design/screen_pr_detail.jsx BriefSkeleton :65-72,
-   BriefEmpty :74-83); only the ready state is the 1fr 1fr grid with Intent
-   in the left Card (:120-123). */
+/* IntentCard — Intent Layer (L03) content for the PR Brief block. It renders
+   no Card of its own: BriefGrid owns the left Card and embeds this. The
+   "Intent" heading appears only in the ready state; loading and error render
+   without a heading, the empty state is compact. */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Card, ErrorState, SectionLabel } from "@devdigest/ui";
+import { ErrorState, SectionLabel } from "@devdigest/ui";
 import { usePrIntent, useGenerateIntent } from "@/lib/hooks/intent";
 import { IntentBlock } from "./_components/IntentBlock";
 import { IntentEmpty } from "./_components/IntentEmpty";
 import { IntentSkeleton } from "./_components/IntentSkeleton";
-import { s } from "./styles";
 
 export function IntentCard({ prId }: { prId: string | null }) {
   const t = useTranslations("brief");
@@ -27,11 +25,9 @@ export function IntentCard({ prId }: { prId: string | null }) {
     }
     if (!intent) return <IntentEmpty onGenerate={() => generate.mutate(false)} />;
     return (
-      <div style={s.dataGrid}>
-        <Card>
-          <SectionLabel icon="Target">{t("intent.label")}</SectionLabel>
-          <IntentBlock record={intent} />
-        </Card>
+      <div>
+        <SectionLabel icon="Target">{t("intent.label")}</SectionLabel>
+        <IntentBlock record={intent} />
       </div>
     );
   })();

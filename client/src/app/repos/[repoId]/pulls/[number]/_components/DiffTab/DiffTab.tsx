@@ -3,7 +3,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { SectionLabel, Button } from "@devdigest/ui";
-import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
+import { DiffViewer, type DiffCommentApi, type DiffTarget } from "@/components/diff-viewer";
 import { usePrComments, useCreatePrComment } from "@/lib/hooks/reviews";
 import { useSmartDiff } from "@/lib/hooks/smart-diff";
 import { notify } from "@/lib/toast";
@@ -20,10 +20,13 @@ interface DiffTabProps {
   files: PrFile[];
   /** Inline commenting is offered only on open PRs (GitHub rejects otherwise). */
   canComment?: boolean;
+  /** Deep-link target (`?file=&line=`): expanded, scrolled to and highlighted. */
+  target?: DiffTarget | null;
 }
 
-export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
+export function DiffTab({ prId, filesCount, files, canComment, target }: DiffTabProps) {
   const t = useTranslations("prReview");
+  const tBrief = useTranslations("brief");
   const { data: comments } = usePrComments(prId);
   const create = useCreatePrComment(prId);
   // One toggle covers both GitHub comments and findings, and defaults to
@@ -39,6 +42,12 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
   const filesLoaded = files.length > 0;
   const { data: smartDiff, isLoading: smartLoading, isError: smartError } = useSmartDiff(prId, filesLoaded);
   const showSmart = order === "smart" && filesLoaded && !smartLoading && !smartError && !!smartDiff;
+
+  // Only a target that names a file of this PR is passed down; anything else
+  // gets a note instead (the param is compared with PR paths, never fetched).
+  const inDiff = !!target && files.some((f) => f.path === target.file);
+  const activeTarget = inDiff ? target : undefined;
+  const viewerKey = activeTarget ? `${activeTarget.file}:${activeTarget.line}` : "none";
 
   const commentCount = comments?.length ?? 0;
   const toggleCount = commentCount + findingsCount;
@@ -95,10 +104,28 @@ export function DiffTab({ prId, filesCount, files, canComment }: DiffTabProps) {
         </div>
         <OrderToggle order={order} onChange={setOrder} />
       </div>
+      {target && !inDiff && (
+        <div role="status" style={s.notInDiff}>
+          {tBrief("brief.notInDiff", { file: target.file })}
+        </div>
+      )}
       {showSmart && smartDiff ? (
-        <SmartDiffGroups groups={smartDiff.groups} files={files} commenting={commenting} findings={findingsApi} />
+        <SmartDiffGroups
+          key={viewerKey}
+          groups={smartDiff.groups}
+          files={files}
+          commenting={commenting}
+          findings={findingsApi}
+          target={activeTarget}
+        />
       ) : (
-        <DiffViewer files={files} commenting={commenting} findings={findingsApi} />
+        <DiffViewer
+          key={viewerKey}
+          files={files}
+          commenting={commenting}
+          findings={findingsApi}
+          target={activeTarget}
+        />
       )}
     </section>
   );

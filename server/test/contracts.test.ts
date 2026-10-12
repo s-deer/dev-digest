@@ -20,7 +20,12 @@ import {
   GenerateIntentBody,
   SetProjectContextBody,
   ProjectContextRecord,
+  BriefModelOutput,
+  BriefRiskOut,
+  BriefRiskRecord,
+  PrBriefRecord,
 } from '@devdigest/shared';
+import { toJsonSchema } from '../src/platform/structured.js';
 
 /**
  * Contract tests — parse/round-trip the fixtures from data.jsx/data2.jsx
@@ -309,5 +314,102 @@ describe('Project Context contracts', () => {
     const many = Array.from({ length: 51 }, (_, i) => `docs/${i}.md`);
     expect(SetProjectContextBody.safeParse({ repo_id, paths: many }).success).toBe(false);
     expect(SetProjectContextBody.safeParse({ repo_id, paths: many.slice(0, 50) }).success).toBe(true);
+  });
+});
+
+describe('BriefModelOutput', () => {
+  const risk = {
+    file_refs: ['src/a.ts'],
+    explanation: 'e',
+    title: 't',
+    kind: 'k',
+    severity: 'high' as const,
+    line: null as number | null,
+  };
+  const focus = { file: 'src/a.ts', line: 1, reason: 'r' };
+  const valid = { summary: 'ok', risks: [risk], review_focus: [focus] };
+
+  it('accepts a valid output and enforces the limits', () => {
+    expect(BriefModelOutput.safeParse(valid).success).toBe(true);
+    expect(BriefModelOutput.safeParse({ ...valid, risks: Array(7).fill(risk) }).success).toBe(false);
+    expect(BriefModelOutput.safeParse({ ...valid, review_focus: Array(9).fill(focus) }).success).toBe(false);
+    expect(BriefModelOutput.safeParse({ ...valid, summary: 'x'.repeat(601) }).success).toBe(false);
+    expect(
+      BriefModelOutput.safeParse({ ...valid, risks: [{ ...risk, file_refs: [] }] }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a null or numeric risk line, rejects a missing key and non-positive-integer lines', () => {
+    expect(BriefModelOutput.safeParse({ ...valid, risks: [{ ...risk, line: null }] }).success).toBe(true);
+    expect(BriefModelOutput.safeParse({ ...valid, risks: [{ ...risk, line: 12 }] }).success).toBe(true);
+    const { line: _omit, ...noLine } = risk;
+    expect(BriefModelOutput.safeParse({ ...valid, risks: [noLine] }).success).toBe(false);
+    for (const bad of [0, 1.5, '3']) {
+      expect(BriefModelOutput.safeParse({ ...valid, risks: [{ ...risk, line: bad }] }).success).toBe(false);
+      expect(BriefRiskRecord.safeParse({ ...risk, line: bad }).success).toBe(false);
+    }
+  });
+
+  it('accepts any kind string (instructions guide, the schema stays permissive)', () => {
+    for (const kind of ['api-contract', 'Security']) {
+      expect(BriefModelOutput.safeParse({ ...valid, risks: [{ ...risk, kind }] }).success).toBe(true);
+    }
+  });
+
+  it('keeps the observe-before-judge key order with line right after file_refs', () => {
+    const order = ['file_refs', 'line', 'explanation', 'title', 'kind', 'severity'];
+    expect(Object.keys(BriefRiskOut.shape)).toEqual(order);
+    expect(Object.keys(BriefRiskRecord.shape)).toEqual(order);
+  });
+
+  it('strict-mode guard: every property of every object is required and line is anyOf [integer, null]', () => {
+    // Same converter the LLM adapters use (platform/structured -> reviewer-core toJsonSchema).
+    const { schema } = toJsonSchema(BriefModelOutput, 'PrBrief');
+    const objects: { properties?: Record<string, unknown>; required?: string[] }[] = [];
+    const walk = (node: unknown): void => {
+      if (!node || typeof node !== 'object') return;
+      if (Array.isArray(node)) return node.forEach(walk);
+      const n = node as Record<string, unknown>;
+      if (n.properties) objects.push(n as never);
+      Object.values(n).forEach(walk);
+    };
+    walk(schema);
+    expect(objects.length).toBeGreaterThan(0);
+    for (const o of objects) {
+      expect([...(o.required ?? [])].sort()).toEqual(Object.keys(o.properties ?? {}).sort());
+    }
+    const riskObj = objects.find((o) => o.properties && 'file_refs' in o.properties)!;
+    const line = riskObj.properties!.line as { anyOf?: { type?: string }[] };
+    expect(line.anyOf?.map((x) => x.type).sort()).toEqual(['integer', 'null']);
+  });
+});
+
+describe('PrBriefRecord risk line', () => {
+  const base = {
+    summary: 's',
+    review_focus: [],
+    head_sha: 'a',
+    generated_at: 'now',
+    provider: 'openai',
+    model: 'm',
+    usage: { tokens_in: 1, tokens_out: 1, cost_usd: null, attempts: 1, input_tokens_total: 1, input_tokens_by_source: {} },
+    reductions: [],
+    facts: {
+      intent: 'present',
+      blast: { status: 'present' },
+      linked_issue: 'none',
+      description: 'empty',
+      specs: { status: 'none_attached', agent: null, included_paths: [], omitted_paths: [] },
+    },
+    grounding: { risks_dropped: 0, risk_refs_removed: 0, focus_dropped: 0, focus_lines_snapped: 0 },
+  };
+  const r1 = { file_refs: ['a.ts'], explanation: 'e', title: 't', kind: 'api-contract', severity: 'low' };
+
+  it('parses a revision-1 record (no line, no counters), a null line and a numeric line', () => {
+    expect(PrBriefRecord.safeParse({ ...base, risks: [r1] }).success).toBe(true);
+    expect(PrBriefRecord.safeParse({ ...base, risks: [{ ...r1, line: null }] }).success).toBe(true);
+    expect(PrBriefRecord.safeParse({ ...base, risks: [{ ...r1, line: 12 }] }).success).toBe(true);
+    const withCounters = { ...base.grounding, risk_lines_snapped: 1, risk_lines_dropped: 2 };
+    expect(PrBriefRecord.safeParse({ ...base, risks: [], grounding: withCounters }).success).toBe(true);
   });
 });

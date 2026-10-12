@@ -7,13 +7,14 @@
 
 import React from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Skeleton, ErrorState } from "@devdigest/ui";
 import { AppShell } from "../../../../../components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
 import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
-import { DiffTab } from "./_components/DiffTab";
+import { DiffTab, parseDiffTarget } from "./_components/DiffTab";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
 import { usePullDetail, usePulls } from "../../../../../lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,14 +23,18 @@ import { intentKey } from "@/lib/hooks/intent";
 import { smartDiffKey } from "@/lib/hooks/smart-diff";
 import { useActiveRepo, useRepoNotFound } from "../../../../../lib/repo-context";
 import { ApiError } from "../../../../../lib/api";
+import { notify } from "../../../../../lib/toast";
 import { githubPrUrl } from "../../../../../lib/github-urls";
 import type { FindingRecord } from "@devdigest/shared";
+
+const NOT_IN_DIFF_MS = 2600;
 
 export default function PRDetailPage() {
   const params = useParams<{ repoId: string; number: string }>();
   const search = useSearchParams();
   const router = useRouter();
   const { repoId, number } = params;
+  const tBrief = useTranslations("brief");
   const { activeRepo } = useActiveRepo();
   const repoNotFound = useRepoNotFound(repoId);
   // The route is keyed by PR number, but every PR API is keyed by the row's
@@ -61,13 +66,41 @@ export default function PRDetailPage() {
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
+  const navigate = (sp: URLSearchParams, mode: "push" | "replace") => {
+    const url = `/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`;
+    if (mode === "push") router.push(url);
+    else router.replace(url);
+  };
   const setParam = (key: string, val: string | null) => {
     const sp = new URLSearchParams(search.toString());
     if (val == null) sp.delete(key);
     else sp.set(key, val);
-    router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
+    navigate(sp, "replace");
   };
-  const setTab = (t: string) => setParam("tab", t);
+  // Leaving Files changed must not keep a stale deep-link target in the URL.
+  const setTab = (t: string) => {
+    const sp = new URLSearchParams(search.toString());
+    sp.set("tab", t);
+    sp.delete("file");
+    sp.delete("line");
+    navigate(sp, "replace");
+  };
+  // Brief → Files changed: a real history entry, so Back returns to Overview.
+  // A target the PR's diff doesn't contain stays on Overview with a short
+  // notice instead (no URL or history change).
+  const openFile = (file: string, line: number | null) => {
+    if (!pr?.files.some((f) => f.path === file)) {
+      notify.warn(tBrief("brief.notInDiff", { file }), { durationMs: NOT_IN_DIFF_MS, key: "not-in-diff" });
+      return;
+    }
+    const sp = new URLSearchParams(search.toString());
+    sp.set("tab", "diff");
+    sp.set("file", file);
+    if (line == null) sp.delete("line");
+    else sp.set("line", String(line));
+    navigate(sp, "push");
+  };
+  const diffTarget = parseDiffTarget(search);
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = reviews ?? [];
@@ -143,6 +176,8 @@ export default function PRDetailPage() {
             repoId={repoId}
             repoFullName={repoFullName}
             headSha={pr.head_sha}
+            reviews={reviews}
+            onOpenFile={openFile}
           />
         )}
 
@@ -179,6 +214,7 @@ export default function PRDetailPage() {
             filesCount={pr.files_count}
             files={pr.files}
             canComment={pr.status === "open"}
+            target={diffTarget}
           />
         )}
       </div>

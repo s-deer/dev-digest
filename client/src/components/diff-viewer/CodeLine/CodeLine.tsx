@@ -13,6 +13,7 @@ import { s, lineRowFor, lineSignFor, sevLabelFor, sevStripeFor } from "../styles
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 import { FindingComment } from "../FindingComment";
+import { useReducedMotion } from "../useReducedMotion";
 
 export function CodeLine({
   ln,
@@ -21,6 +22,7 @@ export function CodeLine({
   commenting,
   lineFindings,
   findings,
+  highlighted,
 }: {
   ln: Line;
   path: string;
@@ -28,10 +30,13 @@ export function CodeLine({
   commenting?: DiffCommentApi;
   lineFindings: FindingRecord[];
   findings?: DiffFindingsApi;
+  /** Deep-link target line: pulses once (static tint under reduced motion). */
+  highlighted?: boolean;
 }) {
   const t = useTranslations("prReview");
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
+  const reduced = useReducedMotion();
 
   if (ln.kind === "hunk") {
     return (
@@ -54,7 +59,10 @@ export function CodeLine({
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
+      <div
+        style={lineRowFor(ln.kind, highlighted, reduced)}
+        data-new-line={ln.kind !== "del" ? ln.newNo : undefined}
+      >
         {topSev && sevColor && <span aria-hidden="true" style={sevStripeFor(sevColor)} />}
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
