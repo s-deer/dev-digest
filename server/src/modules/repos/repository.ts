@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 
@@ -73,8 +73,17 @@ export class RepoRepository {
   async updateClonePath(repoId: string, clonePath: string): Promise<void> {
     await this.db
       .update(t.repos)
-      .set({ clonePath, lastPolledAt: new Date() })
+      .set({ clonePath, lastSyncedAt: new Date() })
       .where(eq(t.repos.id, repoId));
+  }
+
+  /** Number of open pull requests for a repo. */
+  async countOpenPulls(repoId: string): Promise<number> {
+    const rows: any[] = await this.db
+      .select({ n: count() })
+      .from(t.pullRequests)
+      .where(and(eq(t.pullRequests.repoId, repoId), eq(t.pullRequests.status, 'open')));
+    return Number(rows[0]?.n ?? 0);
   }
 
   async remove(workspaceId: string, id: string): Promise<boolean> {

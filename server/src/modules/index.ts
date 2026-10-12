@@ -2,7 +2,6 @@ import type { FastifyPluginAsync } from 'fastify';
 import settings from './settings/routes.js';
 import repos from './repos/routes.js';
 import pulls from './pulls/routes.js';
-import polling from './polling/routes.js';
 import workspace from './workspace/routes.js';
 import agents from './agents/routes.js';
 import reviews from './reviews/routes.js';
@@ -32,7 +31,6 @@ export const modules: Record<string, FastifyPluginAsync> = {
   settings,
   repos,
   pulls,
-  polling,
   workspace,
   agents,
   reviews,
