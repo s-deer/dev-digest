@@ -41,7 +41,7 @@ export function withGitHubToken(url: string, token: string): string {
 }
 
 /** Map a persisted repo row to the API `Repo` DTO. */
-export function toRepoDto(row: typeof t.repos.$inferSelect): Repo {
+export function toRepoDto(row: typeof t.repos.$inferSelect, openPulls: number): Repo {
   return {
     id: row.id,
     workspace_id: row.workspaceId,
@@ -50,7 +50,8 @@ export function toRepoDto(row: typeof t.repos.$inferSelect): Repo {
     full_name: row.fullName,
     default_branch: row.defaultBranch,
     clone_path: row.clonePath,
-    last_polled_at: row.lastPolledAt?.toISOString() ?? null,
+    last_synced_at: row.lastSyncedAt?.toISOString() ?? null,
+    open_pulls: openPulls,
     created_by: row.createdBy,
   };
 }
