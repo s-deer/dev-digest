@@ -50,6 +50,7 @@ export function buildRunTrace(input: BuildTraceInput): RunTrace {
     raw_output: input.rawOutput,
     memory_pulled: input.memoryPulled,
     specs_read: input.specsRead,
+    project_context: [],
     log: input.log,
   };
   // Validate so a malformed trace fails loudly at write-time, not read-time.
@@ -58,5 +59,16 @@ export function buildRunTrace(input: BuildTraceInput): RunTrace {
 
 /** An empty prompt-assembly for detectors that don't call an LLM. */
 export function emptyPromptAssembly(system: string, user: string): PromptAssembly {
-  return { system, skills: null, skills_tokens: 0, skill_blocks: [], memory: null, specs: null, user };
+  return {
+    system,
+    skills: null,
+    skills_tokens: 0,
+    skill_blocks: [],
+    memory: null,
+    specs: null,
+    project_specs: null,
+    project_context_tokens: 0,
+    project_specs_tokens: 0,
+    user,
+  };
 }

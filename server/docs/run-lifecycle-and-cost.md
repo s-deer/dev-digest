@@ -55,6 +55,17 @@ concurrent double-POST can still race). `GET /runs/:id` (`RunDetail`) is the
 read side — status, cost, and once a review was persisted, its verdict/score/
 findings — used by the MCP `get_findings` tool.
 
+### Project Context in a run
+
+After the skill blocks are built, `runOneAgent` resolves the agent's and its
+enabled skills' attached repository docs (`ProjectContextResolver.resolveForRun`;
+default-branch sha, never the PR head) and injects them as untrusted
+`## Project context` / `## Project specifications` sections. They add input
+tokens to every LLM call of the run (map-reduce repeats them per chunk) but no
+extra calls. Skipped docs never fail the run; the trace records them in
+`project_context[]` and the Live Log names the reason. See
+[`project-context.md`](project-context.md#run-time-and-trace-fields).
+
 ### Live events and cancellation
 
 - Events go through the in-memory `RunBus` (`src/platform/sse.ts:19`).

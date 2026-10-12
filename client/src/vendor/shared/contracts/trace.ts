@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FindingsSummary } from './findings.js';
+import { ProjectContextRecord } from './project-context.js';
 
 /**
  * Run trace. The ENTIRE trace of one run is persisted as a SINGLE
@@ -57,7 +58,14 @@ export const PromptAssembly = z.object({
   /** Per-skill blocks in prompt order; empty for runs without skills and for older traces. */
   skill_blocks: z.array(PromptSkillBlock).default([]),
   memory: z.string().nullish(),
+  /** `## Project context` text (agent-attached documents); null when none. */
   specs: z.string().nullish(),
+  /** `## Project specifications` text (skill-attached documents); null when none. Absent on older traces. */
+  project_specs: z.string().nullish(),
+  /** Tokens of the injected `## Project context` documents. */
+  project_context_tokens: z.number().int().nonnegative().default(0),
+  /** Tokens of the injected `## Project specifications` documents. */
+  project_specs_tokens: z.number().int().nonnegative().default(0),
   /** Callers-of-changed-symbols digest (repo-intel); null when absent. */
   callers: z.string().nullish(),
   /** Repo skeleton / map (repo-intel); null when absent. */
@@ -103,6 +111,8 @@ export const RunTrace = z.object({
   raw_output: z.string(),
   memory_pulled: z.array(MemoryPulled),
   specs_read: z.array(z.string()),
+  /** Every attached project document the run considered (injected or skipped); [] on older traces. */
+  project_context: z.array(ProjectContextRecord).default([]),
   log: z.array(RunLogLine),
 });
 export type RunTrace = z.infer<typeof RunTrace>;

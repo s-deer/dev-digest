@@ -13,7 +13,7 @@ import {
   renderIntentUserMessage,
 } from './domain.js';
 import type { IntentInputs, StoredIntent, UpsertIntentInput } from './domain.js';
-import { IntentExtractionSchema, SYSTEM_PROMPT } from './prompt.js';
+import { IntentExtractionEnglish, SYSTEM_PROMPT } from './prompt.js';
 import { INTENT_MAX_TOKENS, INTENT_TEMPERATURE, INTENT_TIMEOUT_MS } from './constants.js';
 import { toIntentRecord } from './helpers.js';
 
@@ -234,7 +234,7 @@ export class IntentService {
       const llm = await this.deps.llm(model.provider);
       result = await llm.completeStructured({
         model: model.model,
-        schema: IntentExtractionSchema,
+        schema: IntentExtractionEnglish,
         schemaName: 'PrIntent',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },

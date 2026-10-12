@@ -208,6 +208,14 @@ export interface GitCommit {
   date: string;
 }
 
+/** One blob in a commit's tree (`git ls-tree -r -l`). `mode` 120000 = symlink, 160000 = submodule. */
+export interface TreeEntry {
+  path: string;
+  mode: string;
+  size: number;
+  sha: string;
+}
+
 export interface GitClient {
   clone(repo: RepoRef, url: string, opts?: CloneOptions): Promise<{ path: string }>;
   fetchPullHead(repo: RepoRef, n: number): Promise<void>;
@@ -236,6 +244,11 @@ export interface GitClient {
    * Throws if the file does not exist at `ref`.
    */
   readFileAt(repo: RepoRef, ref: string, path: string): Promise<string>;
+  /**
+   * Every blob in the tree at `ref` (`git ls-tree -r -l -z`), tracked files only.
+   * Symlinks (mode 120000) and submodules (160000) are reported so callers can reject them.
+   */
+  listTree(repo: RepoRef, ref: string): Promise<TreeEntry[]>;
   clonePathFor(repo: RepoRef): string;
 }
 

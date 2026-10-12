@@ -13,6 +13,12 @@ re-discovered the hard way.
 - **Do:** ALWAYS order schema fields observe → count → classify → score. NEVER put `category`/`confidence`/`severity` first for readability.
 - **Evidence:** commit `641b637` (`server/src/modules/conventions/prompt.ts`, `docs/specs/conventions.md` §5.2); angular-osf scan with deepseek-v4-flash.
 
+### 2026-10-12 · A `superRefine` on a `completeStructured` schema adds a semantic check that reuses the reprompt loop for free
+- **Context:** deepseek-v4-flash returned a whole review (summary + findings) in Chinese; no prompt pinned the output language.
+- **Insight:** `toJsonSchema` sends a byte-identical JSON Schema for `X.superRefine(...)` and `X`, but `parseWithRepair` runs the refinement, so a failed check becomes a reprompt naming the field path. The refinement runs only after the base schema passes.
+- **Do:** Put output-content rules (e.g. English-only via `requireEnglish` from `platform/language.ts`) on the schema passed to `completeStructured`, never in a post-hoc check. Pick only prose fields: verbatim evidence/snippets may be in any language.
+- **Evidence:** `reviewer-core/src/language.ts`, `reviewer-core/test/language.test.ts`, `server/test/english-only-output.test.ts`; PR #13 re-run (run `12a00520`) came back in English.
+
 ## Decisions
 
 ### 2026-09-19 · Skill activation is an agent attachment concern, not only a global skill flag
@@ -124,3 +130,15 @@ re-discovered the hard way.
 - **Insight:** `prFiles.id` (`server/src/db/schema/pulls.ts`) is `uuid('id').primaryKey().defaultRandom()`, so `ORDER BY id` sorts randomly, not by insertion. There's no ordinal/sequence column on `pr_files` to fall back to — the table relies entirely on implicit heap scan order (no `ORDER BY`), which is not a documented guarantee.
 - **Do:** Before adding an explicit `ORDER BY` to a `pr_files` query for "GitHub order", check the column is actually sequential (`GENERATED ALWAYS AS IDENTITY`/serial), not a random uuid. If a real ordinal is needed later, add a dedicated `position`/`sort_index` column via migration rather than relying on `id`.
 - **Evidence:** `server/src/db/schema/pulls.ts` (`prFiles.id`); architecture-reviewer follow-up A1 on `docs/plans/smart-diff-plan.md`.
+
+### 2026-10-10 · `wrapUntrusted` escapes only the exact lowercase `</untrusted>` — sanitise other casings before wrapping
+- **Context:** `modules/brief/input.ts` wraps PR description, issue, spec text, paths and symbols in `<untrusted>` blocks for the PR Brief model call.
+- **Insight:** `wrapUntrusted` (`reviewer-core/src/prompt.ts:40`) does `content.replaceAll('</untrusted>', '<\\/untrusted>')`, so `</UNTRUSTED>`, `</Untrusted >` or a path with an embedded newline can still read as a block boundary to the model. `renderProjectDocBlock` only sanitises the `source=` label, not the content.
+- **Do:** Run untrusted text through `sanitizeUntrusted` (case-insensitive `</untrusted` → `<\/untrusted`) and paths/symbols through `sanitizeInline` (CR/LF → space) from `modules/brief/input.ts` before wrapping. Don't rely on `wrapUntrusted` alone for new prompts.
+- **Evidence:** `server/test/brief-input.test.ts` "keeps injection strings, </UNTRUSTED> and newline paths inside their blocks".
+
+### 2026-10-11 · A Zod `.optional()` field in a model-output schema becomes a required, non-null property in strict structured output
+- **Context:** any schema passed to `completeStructured` (e.g. `BriefModelOutput` in `server/src/vendor/shared/contracts/brief.ts`). Both providers convert it with `toJsonSchema` (`reviewer-core/src/llm/structured.ts:19`, `openai/helpers/zod` `zodResponseFormat`) and send `strict: true` (`reviewer-core/src/llm/openrouter.ts:76`, `server/src/adapters/llm/openai.ts:105`).
+- **Insight:** the converter lists every property in `required` and keeps `.optional()` fields as plain `{"type":"integer"}`. The model can't omit the field, so it invents a value. The SDK only logs "uses `.optional()` without `.nullable()` which is not supported by the API… will become an error in a future version"; nothing fails.
+- **Do:** NEVER use `.optional()` in a model-output schema. Use `.nullable()` (null = absent). Where the same shape is also read from storage written before the field existed, parse the stored record with `.nullish()` in a separate record schema.
+- **Evidence:** `zodResponseFormat(z.object({line: z.number().int().optional()}))` → `"required":["line"]`; with `.nullable()` → `anyOf [integer, null]` (run 2026-10-11, server's `openai` + `zod`).

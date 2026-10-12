@@ -17,15 +17,53 @@
     "noCommits": "No commits found for this line."
   },
   "intent": {
-    "briefLabel": "PR Brief",
     "label": "Intent",
     "inScope": "IN SCOPE",
     "outOfScope": "OUT OF SCOPE",
     "noneStated": "None stated",
+    "emptyTitle": "No intent yet",
+    "emptyBody": "Derive the PR intent from its title, body and linked issue.",
+    "generate": "Derive intent",
+    "loadError": "Couldn't load the PR intent.",
+    "generateError": "Couldn't derive the PR intent."
+  },
+  "brief": {
+    "label": "PR Brief",
+    "risksTitle": "Risk areas",
+    "focusTitle": "Review focus — read these first",
+    "focusCount": "{count}",
+    "focusEmpty": "No specific review focus.",
+    "removedNote": "Left out because they could not be tied to this PR: {risks} risk(s), {focus} focus item(s).",
+    "generatedWithout": "Generated without: {facts}",
+    "fact": {
+      "intent": "derived intent",
+      "intentStale": "up-to-date intent",
+      "blast": "blast radius",
+      "linkedIssue": "linked issue",
+      "description": "PR description",
+      "noAgent": "specs (no agent has reviewed this repo)",
+      "specsUnavailable": "specs (repository unavailable)",
+      "noSpecs": "no specs attached"
+    },
+    "outdated": "Outdated",
+    "refreshAria": "Re-run the brief for this PR",
+    "generating": "Generating the brief…",
+    "hint": "Verdict, findings and score come from the latest agent review. The summary, risks, review focus, cost and tokens come from the brief.",
+    "hintLabel": "Where this information comes from",
+    "riskWhy": "Why this is a risk",
+    "riskAria": "{severity}: {title}",
+    "generate": "Generate brief",
     "emptyTitle": "No brief yet",
     "emptyBody": "Generate a Why+Risk brief for this PR.",
-    "generate": "Generate brief",
-    "loadError": "Couldn't load the PR intent.",
-    "generateError": "Couldn't generate the PR brief."
+    "generateError": "Couldn't generate the PR brief.",
+    "loadError": "Couldn't load the PR brief.",
+    "retry": "Retry",
+    "severity": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "riskFileAria": "Open {file} in Files changed",
+    "notInDiff": "File not in this PR's diff: {file}"
   }
 }

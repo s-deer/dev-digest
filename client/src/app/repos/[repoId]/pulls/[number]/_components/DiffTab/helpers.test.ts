@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { ReviewRecord, FindingRecord, PrFile } from "@devdigest/shared";
-import { latestReviewFindings, findingsByPath, hasReview, diffTotals } from "./helpers";
+import { latestReviewFindings, findingsByPath, hasReview, diffTotals, parseDiffTarget } from "./helpers";
 
 function finding(o: Partial<FindingRecord>): FindingRecord {
   return {
@@ -135,5 +135,25 @@ describe("diffTotals", () => {
 
   it("returns zeros for an empty file list", () => {
     expect(diffTotals([])).toEqual({ add: 0, del: 0 });
+  });
+});
+
+describe("parseDiffTarget", () => {
+  const sp = (q: string) => new URLSearchParams(q);
+
+  it("reads a decoded file and a positive integer line", () => {
+    expect(parseDiffTarget(sp("tab=diff&file=src%2Fa%20b.ts&line=12"))).toEqual({ file: "src/a b.ts", line: 12 });
+  });
+
+  it("turns a bad or odd line into a file-level target", () => {
+    for (const line of ["0", "-3", "1.5", "abc", "", "1e3", "99999999999999999999"]) {
+      expect(parseDiffTarget(sp(`file=a.ts&line=${line}`))).toEqual({ file: "a.ts", line: null });
+    }
+    expect(parseDiffTarget(sp("file=a.ts"))).toEqual({ file: "a.ts", line: null });
+  });
+
+  it("is null without a file or with an empty one", () => {
+    expect(parseDiffTarget(sp("line=3"))).toBeNull();
+    expect(parseDiffTarget(sp("file=&line=3"))).toBeNull();
   });
 });

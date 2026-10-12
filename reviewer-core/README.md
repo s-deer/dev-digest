@@ -41,9 +41,25 @@ is echoed in `assembly.skill_blocks` so the run trace shows one block per skill.
 `renderSkillBlock()` is exported so the caller counts tokens over the exact text
 the model sees.
 
+**Project documents** (repository Markdown attached by hand) arrive as
+`projectContext` (agent-attached → `## Project context`, after any legacy `specs`
+chunks) and `projectSpecs` (skill-attached → `## Project specifications`, right
+after it). Each is `{ path, content, tokens }` and renders as
+`renderProjectDocBlock(doc)`: an `<untrusted source="project-doc:<path>">` block
+(path sanitised, `</untrusted>` in content neutralised). The caller counts tokens
+over that exact string; the assembly records `project_specs`,
+`project_context_tokens` and `project_specs_tokens`. Both sections are omitted when
+empty, and the extra injection-guard sentence naming them is appended only when at
+least one document is present, so prompts without attachments are unchanged.
+
+| Slot | Section | Trust |
+|---|---|---|
+| `specs` (legacy chunks) + `projectContext` | `## Project context` | untrusted |
+| `projectSpecs` | `## Project specifications` | untrusted |
+
 ## Public API
 
-Exported from `src/index.ts`: `assemblePrompt` / `renderSkillBlock` / `wrapUntrusted` (prompt),
+Exported from `src/index.ts`: `assemblePrompt` / `renderSkillBlock` / `renderProjectDocBlock` / `wrapUntrusted` (prompt),
 `groundFindings` / `groundingSummary` (grounding), `toJsonSchema` / `extractJson`
 / `parseWithRepair` (structured output), plus the `run` entrypoint and
 `reduce`. Contracts (`Review`, `Finding`, `Verdict`, …) come from

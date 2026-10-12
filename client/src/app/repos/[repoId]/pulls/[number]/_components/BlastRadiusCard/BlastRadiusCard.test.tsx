@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { BlastRadiusResponse } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/blast.json";
+import briefMessages from "../../../../../../../../messages/en/brief.json";
 import { BlastRadiusCard } from "./BlastRadiusCard";
 
 /** The stats row wraps each count in its own <strong>, so RTL's default
@@ -84,7 +85,7 @@ function renderCard(props: { repoFullName?: string | null; headSha?: string | nu
   const qc = new QueryClient();
   return render(
     <QueryClientProvider client={qc}>
-      <NextIntlClientProvider locale="en" messages={{ blast: messages }}>
+      <NextIntlClientProvider locale="en" messages={{ blast: messages, brief: briefMessages }}>
         <BlastRadiusCard prId="pr1" repoId="repo1" repoFullName={props.repoFullName} headSha={props.headSha} />
       </NextIntlClientProvider>
     </QueryClientProvider>,
@@ -92,6 +93,24 @@ function renderCard(props: { repoFullName?: string | null; headSha?: string | nu
 }
 
 describe("BlastRadiusCard", () => {
+  it("renders the Blast radius heading exactly once in the loading, error and ready states", () => {
+    hooks.isLoading = true;
+    renderCard();
+    expect(screen.getAllByText("Blast radius")).toHaveLength(1);
+
+    cleanup();
+    hooks.isLoading = false;
+    hooks.isError = true;
+    renderCard();
+    expect(screen.getAllByText("Blast radius")).toHaveLength(1);
+
+    cleanup();
+    hooks.isError = false;
+    hooks.data = BLAST;
+    renderCard();
+    expect(screen.getAllByText("Blast radius")).toHaveLength(1);
+  });
+
   it("shows the stats row, a caller link to the head sha, and separate endpoint/cron groups", () => {
     hooks.data = BLAST;
     renderCard({ repoFullName: "acme/payments-api", headSha: "abc1234" });

@@ -23,6 +23,17 @@
   }
 }
 
+/* One-time arrival highlight for a deep-linked diff line: accent tint fading
+   to the row's own background (--dd-line-bg, set inline). */
+@keyframes ddLinePulse {
+  from {
+    background: var(--accent-bg);
+  }
+  to {
+    background: var(--dd-line-bg, transparent);
+  }
+}
+
 /* Block-level Markdown (skill bodies, PR descriptions). The vendored <Markdown>
    styles inline elements only; the global reset flattens headings and lists. */
 .dd-md h1,

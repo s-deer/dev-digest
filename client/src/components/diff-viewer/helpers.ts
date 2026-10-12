@@ -1,6 +1,13 @@
 /** Pure helpers for the DiffViewer. */
 import { HUNK_HEADER_RE } from "./constants";
 
+/** A line (or just a file, when `line` is null) the viewer should open,
+   scroll to and highlight. Generic: the viewer knows nothing about who asks. */
+export interface DiffTarget {
+  file: string;
+  line: number | null;
+}
+
 export interface Line {
   kind: "add" | "del" | "ctx" | "hunk";
   text: string;

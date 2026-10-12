@@ -8,3 +8,4 @@ as `docs/<topic>.md`.
 - [findings-read-model.md](findings-read-model.md): how severity counts and previews for the PR list and Timeline are computed on read, and what `null` means.
 - [intent-layer.md](intent-layer.md): how the Intent Layer (L03) derives why a PR exists, its cache key, confidence rules, API, and cost accounting.
 - [smart-diff.md](smart-diff.md): how Smart Diff (L03) groups a PR's files by role and attaches the latest review's findings — classification check order vs. display order, the route, and why no LLM is called.
+- [project-context.md](project-context.md): how repository docs are discovered from git, attached to agents and skills, injected into a run under a token budget, and recorded in the trace.

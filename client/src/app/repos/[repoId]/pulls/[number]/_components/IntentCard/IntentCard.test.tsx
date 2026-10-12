@@ -66,11 +66,19 @@ function renderCard() {
 }
 
 describe("IntentCard", () => {
+  it("renders a compact skeleton with no heading while loading", () => {
+    hooks.isLoading = true;
+    renderCard();
+    expect(screen.queryByText("Intent")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
   it("renders the quote and IN/OUT scope, but never confidence or sources; an empty out-of-scope list reads 'None stated'", () => {
     hooks.intent = RECORD;
     renderCard();
 
     expect(screen.getByText("“Add rate limiting to the public webhook endpoints.”")).toBeInTheDocument();
+    expect(screen.getAllByText("Intent")).toHaveLength(1);
     expect(screen.getByText("IN SCOPE")).toBeInTheDocument();
     expect(screen.getByText("OUT OF SCOPE")).toBeInTheDocument();
     expect(screen.getByText("Add a token-bucket limiter middleware")).toBeInTheDocument();
@@ -90,8 +98,11 @@ describe("IntentCard", () => {
     hooks.intent = null;
     renderCard();
 
-    expect(screen.getByText("No brief yet")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Generate brief" }));
+    expect(screen.getByText("No intent yet")).toBeInTheDocument();
+    expect(screen.getByText("Derive the PR intent from its title, body and linked issue.")).toBeInTheDocument();
+    expect(screen.queryByText("No brief yet")).not.toBeInTheDocument();
+    expect(screen.queryByText("Intent")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Derive intent" }));
     expect(hooks.mutate).toHaveBeenCalledWith(false);
   });
 
@@ -100,6 +111,7 @@ describe("IntentCard", () => {
     renderCard();
 
     expect(screen.getByText("Couldn't load the PR intent.")).toBeInTheDocument();
+    expect(screen.queryByText("Intent")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(hooks.refetch).toHaveBeenCalledTimes(1);
   });
@@ -109,7 +121,7 @@ describe("IntentCard", () => {
     hooks.generateIsError = true;
     renderCard();
 
-    expect(screen.getByText("Couldn't generate the PR brief.")).toBeInTheDocument();
+    expect(screen.getByText("Couldn't derive the PR intent.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(hooks.mutate).toHaveBeenCalledWith(false);
   });

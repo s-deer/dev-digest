@@ -1,24 +1,61 @@
 {
   "title": "Project Context",
-  "chunks": "{count} chunks",
-  "reindex": "Re-index",
-  "indexing": "Indexing…",
-  "resync": "Resync",
-  "resyncing": "Resyncing…",
-  "indexStatus": "Index status: {status}",
-  "loadError": "Couldn’t load specs",
-  "kb": "{kb}kb",
-  "empty": {
-    "title": "No spec files yet",
-    "body": "Drop your PRDs, tech specs, and acceptance criteria under .devdigest/specs/. Every agent and the PR brief read them as grounding context."
+  "breadcrumb": {
+    "workspace": "Workspace"
   },
-  "mode": {
-    "preview": "preview",
-    "edit": "edit"
+  "page": {
+    "listTitle": "Project Context",
+    "patterns": "Patterns: {patterns}",
+    "footer": "{files, plural, one {# file} other {# files}} · {tokens} tokens total",
+    "refreshed": "refreshed {time}",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing…",
+    "listLabel": "Project documents",
+    "loadError": "Couldn’t load project documents",
+    "retry": "Retry",
+    "empty": {
+      "title": "No project documents found",
+      "body": "No Markdown files in the repository match {patterns}. Commit docs to the default branch and refresh."
+    },
+    "selectDoc": "Select a document to preview it.",
+    "previewLoadError": "Couldn’t load this document",
+    "previewTokens": "{tokens} tokens",
+    "usedBy": "Used by {count, plural, one {# agent} other {# agents}}",
+    "usedByTitle": "Agents using {path}",
+    "usedByClose": "Close",
+    "usedByLoading": "Loading agents…",
+    "direct": "direct",
+    "viaSkill": "via skill {skill}"
   },
-  "editor": {
-    "loadError": "Couldn’t load spec",
-    "save": "Save",
-    "saving": "Saving…"
+  "picker": {
+    "filterLabel": "Filter documents",
+    "filterPlaceholder": "Filter documents…",
+    "noMatch": "No documents match the filter.",
+    "noDocuments": "No documents found in this repository.",
+    "select": "Attach {path}",
+    "preview": "Preview",
+    "previewLabel": "Preview {path}",
+    "tokens": "{tokens} tokens",
+    "overCap": "over the per-document cap",
+    "missing": "missing",
+    "detach": "Detach",
+    "detachLabel": "Detach {path}",
+    "moveUp": "Move {path} up",
+    "moveDown": "Move {path} down",
+    "dragHandle": "Drag to reorder {path}",
+    "inheritedVia": "via skill {skill}",
+    "inheritedLabel": "{path} (inherited via skill {skill}, read-only)",
+    "close": "Close preview",
+    "previewLoadError": "Couldn’t load this document",
+    "noRepo": {
+      "title": "Select a repository",
+      "body": "Project documents are attached per repository. Pick a repository to continue."
+    },
+    "type": {
+      "specs": "specs",
+      "docs": "docs",
+      "insights": "insights",
+      "other": "other"
+    }
   }
 }

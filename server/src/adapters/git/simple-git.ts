@@ -9,6 +9,7 @@ import type {
   UnifiedDiff,
   BlameLine,
   GitCommit,
+  TreeEntry,
 } from '@devdigest/shared';
 import { parseUnifiedDiff } from './diff-parser.js';
 
@@ -143,6 +144,32 @@ export class SimpleGitClient implements GitClient {
     // validation above.
     return this.git(repo).raw(['show', `${ref}:${path}`]);
   }
+
+  async listTree(repo: RepoRef, ref: string): Promise<TreeEntry[]> {
+    if (!HEX_SHA.test(ref)) {
+      throw new Error(`listTree: ref must be a full/short hex SHA, got "${ref}"`);
+    }
+    // argv only (no shell). `-z` keeps paths with unusual characters unquoted.
+    const raw = await this.git(repo).raw(['ls-tree', '-r', '-l', '-z', ref]);
+    return parseLsTree(raw);
+  }
+}
+
+/**
+ * Parse `git ls-tree -r -l -z` output: `<mode> <type> <sha> <size>\t<path>\0`.
+ * Blobs (incl. symlinks, mode 120000) and submodule commits (160000, size `-`)
+ * are returned; callers decide what to reject.
+ */
+export function parseLsTree(raw: string): TreeEntry[] {
+  const out: TreeEntry[] = [];
+  for (const record of raw.split('\0')) {
+    const tab = record.indexOf('\t');
+    if (tab < 0) continue;
+    const [mode, type, sha, size] = record.slice(0, tab).split(/\s+/);
+    if (!mode || !sha || (type !== 'blob' && type !== 'commit')) continue;
+    out.push({ path: record.slice(tab + 1), mode, size: size && size !== '-' ? Number(size) : 0, sha });
+  }
+  return out;
 }
 
 const HEX_SHA = /^[0-9a-f]{7,40}$/i;

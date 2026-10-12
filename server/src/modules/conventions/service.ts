@@ -25,7 +25,7 @@ import {
   type SampledFile,
   type VerifiedCandidate,
 } from './helpers.js';
-import { ExtractionSchema, SYSTEM_PROMPT, buildUserMessage } from './prompt.js';
+import { ExtractionEnglish, SYSTEM_PROMPT, buildUserMessage } from './prompt.js';
 import {
   CONFIG_SAMPLE_PATHS,
   EXTRACT_MAX_TOKENS,
@@ -181,7 +181,7 @@ export class ConventionsService {
       const llm = await this.deps.llm(model.provider);
       const result = await llm.completeStructured({
         model: model.model,
-        schema: ExtractionSchema,
+        schema: ExtractionEnglish,
         schemaName: 'ConventionExtraction',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },

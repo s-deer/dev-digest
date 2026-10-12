@@ -15,6 +15,7 @@ import { ToolCallRow } from "../ToolCallRow";
 import { PromptBlock } from "../PromptBlock";
 import { SkillBlocks } from "../SkillBlocks";
 import { FindingsSection } from "../FindingsSection";
+import { SpecsRead } from "../SpecsRead";
 import { Row, Stat } from "../atoms";
 
 export function TraceBody({ trace, findings }: { trace: RunTrace; findings: FindingRecord[] }) {
@@ -38,17 +39,7 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
             <span>{t("trace.config.items", { count: trace.memory_pulled.length })}</span>
           </Row>
           <Row label={t("trace.config.specsRead")}>
-            <div style={s.specsWrap}>
-              {trace.specs_read.length === 0 ? (
-                <span style={s.specsNone}>{t("trace.config.none")}</span>
-              ) : (
-                trace.specs_read.map((sp, i) => (
-                  <span key={i} className="mono" style={s.spec}>
-                    {sp}
-                  </span>
-                ))
-              )}
-            </div>
+            <SpecsRead paths={trace.specs_read} records={trace.project_context} />
           </Row>
         </div>
       </TraceSection>
@@ -86,6 +77,13 @@ export function TraceBody({ trace, findings }: { trace: RunTrace; findings: Find
         )}
         {trace.prompt_assembly.specs != null && (
           <PromptBlock label={t("trace.prompt.specs")} text={trace.prompt_assembly.specs} color={PROMPT_COLORS.specs} />
+        )}
+        {trace.prompt_assembly.project_specs != null && (
+          <PromptBlock
+            label={t("trace.prompt.projectSpecs")}
+            text={trace.prompt_assembly.project_specs}
+            color={PROMPT_COLORS.projectSpecs}
+          />
         )}
         {trace.prompt_assembly.callers != null && (
           <PromptBlock label={t("trace.prompt.callers")} text={trace.prompt_assembly.callers} color={PROMPT_COLORS.callers} />

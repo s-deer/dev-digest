@@ -33,6 +33,10 @@ import { SmartDiffRepository } from '../modules/smart-diff/repository.js';
 import { SmartDiffService } from '../modules/smart-diff/service.js';
 import { BlastRepository } from '../modules/blast/repository.js';
 import { BlastService } from '../modules/blast/service.js';
+import { ProjectContextRepository } from '../modules/project-context/repository.js';
+import { ProjectContextService } from '../modules/project-context/service.js';
+import { BriefRepository } from '../modules/brief/repository.js';
+import { BriefService } from '../modules/brief/service.js';
 import { resolveFeatureModel } from '../modules/settings/feature-models.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
@@ -60,6 +64,8 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** Project Context service — tests inject a pre-built/faked one. */
+  projectContextService?: ProjectContextService;
 }
 
 export class Container {
@@ -89,6 +95,10 @@ export class Container {
   private _smartDiffService?: SmartDiffService;
   private _blastRepo?: BlastRepository;
   private _blastService?: BlastService;
+  private _projectContextRepo?: ProjectContextRepository;
+  private _projectContextService?: ProjectContextService;
+  private _briefRepo?: BriefRepository;
+  private _briefService?: BriefService;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -156,6 +166,39 @@ export class Container {
   /** BlastService (L04) — narrow deps, no `Container` (see onion-architecture). */
   get blastService(): BlastService {
     return (this._blastService ??= new BlastService({ source: this.blastRepo, repoIntel: this.repoIntel }));
+  }
+
+  get projectContextRepo(): ProjectContextRepository {
+    return (this._projectContextRepo ??= new ProjectContextRepository(this.db));
+  }
+
+  /** ProjectContextService — narrow deps, no `Container` (see onion-architecture). */
+  get projectContextService(): ProjectContextService {
+    if (this.overrides.projectContextService) return this.overrides.projectContextService;
+    return (this._projectContextService ??= new ProjectContextService({
+      store: this.projectContextRepo,
+      git: this.git,
+      tokenizer: this.tokenizer,
+      patterns: this.config.projectContextPatterns,
+    }));
+  }
+
+  get briefRepo(): BriefRepository {
+    return (this._briefRepo ??= new BriefRepository(this.db));
+  }
+
+  /** BriefService (L05) — narrow deps, no `Container` (see onion-architecture). */
+  get briefService(): BriefService {
+    return (this._briefService ??= new BriefService({
+      store: this.briefRepo,
+      intents: this.intentService,
+      blast: this.blastService,
+      specs: this.projectContextService,
+      github: () => this.github(),
+      tokenizer: this.tokenizer,
+      resolveModel: (workspaceId) => resolveFeatureModel(this, workspaceId, 'risk_brief'),
+      llm: (provider) => this.llm(provider),
+    }));
   }
 
   get codeIndex(): CodeIndex {

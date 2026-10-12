@@ -26,6 +26,8 @@ const EnvSchema = z.object({
   // Note: even when on, sections only populate once the repo is indexed; an
   // unindexed repo degrades gracefully. Per-agent override: agents.repo_intel.
   REPO_INTEL_ENABLED: z.string().optional(),
+  // Project Context discovery globs, `;`-separated (globs contain commas). Empty → default.
+  PROJECT_CONTEXT_PATTERNS: z.string().optional(),
   API_PORT: z.coerce.number().int().default(3001),
   API_HOST: z.string().default('127.0.0.1'),
   WEB_PORT: z.coerce.number().int().default(3000),
@@ -38,6 +40,9 @@ const EnvSchema = z.object({
     z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).optional(),
   ),
 });
+
+/** Default Project Context discovery pattern: Markdown under a specs/docs/insights folder, any depth. */
+export const DEFAULT_PROJECT_CONTEXT_PATTERNS = ['**/{specs,docs,insights}/**/*.md'];
 
 export type AppConfig = {
   databaseUrl: string;
@@ -61,7 +66,17 @@ export type AppConfig = {
    * EXACTLY like the ripgrep-only baseline.
    */
   repoIntelEnabled: boolean;
+  /** Project Context discovery globs (apply to every repository). Env: `PROJECT_CONTEXT_PATTERNS`, `;`-separated. */
+  projectContextPatterns: string[];
 };
+
+function parsePatterns(raw: string | undefined): string[] {
+  const patterns = (raw ?? '')
+    .split(';')
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  return patterns.length > 0 ? patterns : [...DEFAULT_PROJECT_CONTEXT_PATTERNS];
+}
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
@@ -80,5 +95,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: `http://localhost:${parsed.WEB_PORT}`,
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
+    projectContextPatterns: parsePatterns(parsed.PROJECT_CONTEXT_PATTERNS),
   };
 }

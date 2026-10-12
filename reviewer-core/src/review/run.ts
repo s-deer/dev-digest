@@ -8,10 +8,21 @@ import type {
   RunEventKind,
   UnifiedDiff,
 } from '@devdigest/shared';
-import { Review as ReviewSchema } from '@devdigest/shared';
-import { assemblePrompt } from '../prompt.js';
+import { Review as ReviewContract } from '@devdigest/shared';
+import { requireEnglish } from '../language.js';
+import { assemblePrompt, type ProjectDocInput } from '../prompt.js';
 import { groundFindings, groundingSummary } from '../grounding.js';
 import { reduceReviews, scoreFromFindings, sliceDiff } from './reduce.js';
+
+/** The model's Review, with its prose fields required to be English (reprompts otherwise). */
+const ReviewSchema = requireEnglish(ReviewContract, (r) => [
+  [['summary'], r.summary],
+  ...r.findings.flatMap((f, i) => [
+    [['findings', i, 'title'], f.title] as const,
+    [['findings', i, 'rationale'], f.rationale] as const,
+    [['findings', i, 'suggestion'], f.suggestion] as const,
+  ]),
+]);
 
 /**
  * reviewPullRequest — the review engine entry point.
@@ -60,6 +71,10 @@ export interface ReviewInput {
   memory?: string[];
   /** Project-context spec chunks (untrusted; delimiter-wrapped downstream). */
   specs?: string[];
+  /** Agent-attached project documents (untrusted) → `## Project context`. */
+  projectContext?: ProjectDocInput[];
+  /** Skill-attached project documents (untrusted) → `## Project specifications`. */
+  projectSpecs?: ProjectDocInput[];
   /**
    * Optional callers-of-changed-symbols digest (T1.3). Untrusted; rendered
    * before the diff section. Empty/undefined → section omitted.
@@ -141,6 +156,8 @@ export async function reviewPullRequest(input: ReviewInput): Promise<ReviewOutco
     skills: input.skills,
     memory: input.memory,
     specs: input.specs,
+    projectContext: input.projectContext,
+    projectSpecs: input.projectSpecs,
     callers: input.callers,
     repoMap: input.repoMap,
     prDescription: input.prDescription,

@@ -2,6 +2,7 @@ import type { IconName } from "@devdigest/ui";
 
 export const TABS = [
   { key: "config", labelKey: "detail.tabs.config", icon: "Settings" },
+  { key: "context", labelKey: "detail.tabs.context", icon: "FileText" },
   { key: "preview", labelKey: "detail.tabs.preview", icon: "Eye" },
   { key: "versioning", labelKey: "detail.tabs.versioning", icon: "History" },
 ] as const satisfies readonly { key: string; labelKey: string; icon: IconName }[];

@@ -8,7 +8,7 @@
 
 import React from "react";
 import type { PrFile, SmartDiffGroup, SmartDiffRole } from "@devdigest/shared";
-import { DiffViewer, type DiffCommentApi, type DiffFindingsApi } from "@/components/diff-viewer";
+import { DiffViewer, type DiffCommentApi, type DiffFindingsApi, type DiffTarget } from "@/components/diff-viewer";
 import { COLLAPSED_BY_DEFAULT } from "../../constants";
 import { GroupHeader } from "./_components/GroupHeader";
 import { buildGroupedFiles } from "./helpers";
@@ -19,15 +19,23 @@ export function SmartDiffGroups({
   files,
   commenting,
   findings,
+  target,
 }: {
   groups: SmartDiffGroup[];
   files: PrFile[];
   commenting?: DiffCommentApi;
   findings?: DiffFindingsApi;
+  /** Deep-link target: its group starts expanded even if collapsed by default. */
+  target?: DiffTarget;
 }) {
   const grouped = React.useMemo(() => buildGroupedFiles(groups, files), [groups, files]);
   const [collapsed, setCollapsed] = React.useState<Set<SmartDiffRole>>(
-    () => new Set(COLLAPSED_BY_DEFAULT),
+    () => {
+      const initial = new Set<SmartDiffRole>(COLLAPSED_BY_DEFAULT);
+      const targetGroup = target && grouped.find((g) => g.entries.some((e) => e.file.path === target.file));
+      if (targetGroup) initial.delete(targetGroup.role);
+      return initial;
+    },
   );
 
   const toggle = (role: SmartDiffRole) => {
@@ -58,6 +66,7 @@ export function SmartDiffGroups({
                 files={g.entries.map((e) => e.file)}
                 commenting={commenting}
                 findings={findings}
+                target={target}
               />
             )}
           </div>
