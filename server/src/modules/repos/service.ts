@@ -2,7 +2,7 @@ import type { Container } from '../../platform/container.js';
 import { type Repo } from '@devdigest/shared';
 import { NotFoundError } from '../../platform/errors.js';
 import { RepoRepository } from './repository.js';
-import { parseRepoUrl, withGitHubToken, toRepoDto } from './helpers.js';
+import { parseRepoUrl, withGitHubToken, toRepoDto } from './mappers.js';
 import {
   CLONE_JOB_KIND,
   CLONE_DEPTH,
@@ -92,7 +92,7 @@ export class RepoService {
     const fullName = `${owner}/${name}`;
 
     const existing = await this.repo.findByFullName(workspaceId, fullName);
-    if (existing) return { repo: toRepoDto(existing), created: false };
+    if (existing) return { repo: toRepoDto(existing, await this.repo.countOpenPulls(existing.id)), created: false };
 
     const row = await this.repo.insert({ workspaceId, owner, name, fullName, createdBy: userId });
     await this.container.jobs.enqueue(workspaceId, CLONE_JOB_KIND, {
@@ -102,12 +102,14 @@ export class RepoService {
       url,
     } satisfies CloneJobPayload);
 
-    return { repo: toRepoDto(row), created: true };
+    return { repo: toRepoDto(row, 0), created: true };
   }
 
   async list(workspaceId: string): Promise<Repo[]> {
     const rows = await this.repo.list(workspaceId);
-    return rows.map(toRepoDto);
+    const out: Repo[] = [];
+    for (const r of rows) out.push(toRepoDto(r, await this.repo.countOpenPulls(r.id)));
+    return out;
   }
 
   /** Re-fetch the clone for an existing repo (enqueues a fresh `clone` job). */

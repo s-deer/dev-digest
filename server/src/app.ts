@@ -18,6 +18,7 @@ import { AppError } from './platform/errors.js';
 import { modules } from './modules/index.js';
 import { ReviewService } from './modules/reviews/service.js';
 import { ConventionsRepository } from './modules/conventions/repository.js';
+import { startRepoSync } from './modules/repos/sync-scheduler.js';
 
 // Attach the DI container to every request/instance.
 declare module 'fastify' {
@@ -95,13 +96,13 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   // Security headers (X-Content-Type-Options, X-Frame-Options, …). The API
   // serves JSON only, so the default CSP is fine.
   await app.register(helmet);
-  await app.register(cors, { origin: [config.webOrigin], credentials: true });
+  await app.register(cors, { origin: true, credentials: true });
   await app.register(FastifySSEPlugin);
 
   // Global rate limit. Disabled under test so integration suites can hammer
   // endpoints via inject(); per-route overrides live on the routes themselves.
   if (config.nodeEnv !== 'test') {
-    await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
+    await app.register(rateLimit, { max: 10_000, timeWindow: '1 minute' });
   }
 
   // Liveness check (no module, no DB, no rate limit).
@@ -183,6 +184,9 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   for (const plugin of Object.values(modules)) {
     await app.register(plugin);
   }
+
+  // Scheduled repo sync (every 5 minutes) — replaces the manual poll endpoint.
+  if (config.repoSyncEnabled) startRepoSync(container);
 
   // Close the db handle we created on shutdown.
   if (handle) app.addHook('onClose', async () => handle.close());

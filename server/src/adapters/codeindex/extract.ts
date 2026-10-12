@@ -197,16 +197,21 @@ export function extractEndpoints(content: string): string[] {
 /**
  * Heuristic cron/scheduled-job detector. Catches cron expressions in
  * `schedule('* * * * *')`, `cron.schedule(...)`, `CronJob(...)`, and
- * `jobs.register('kind')` / `enqueue(ws, 'kind')` style background work.
+ * `jobs.register('kind')` / `enqueue(ws, 'kind')` style background work, and
+ * schedules registered with an UPPER_SNAKE constant (`cron.schedule(SYNC_CRON, …)`,
+ * emitted as `cron:SYNC_CRON`).
  */
 export function extractCrons(content: string): string[] {
   const out = new Set<string>();
   const lines = content.split('\n');
   const cronExprRe = /\b(?:cron|schedule|CronJob)\s*[.(]?\s*\(?\s*['"`]([^'"`]*(?:\*|\d+\s+\d+)[^'"`]*)['"`]/i;
+  const cronConstRe = /\b(?:cron\.)?schedule\s*\(\s*([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*)\s*,/;
   const jobKindRe = /\b(?:register|enqueue)\s*\(\s*(?:[A-Za-z0-9_$.]+\s*,\s*)?['"`]([a-z][a-z0-9_]*)['"`]/i;
   for (const raw of lines) {
     const m = raw.match(cronExprRe);
     if (m) out.add(m[1]!.trim());
+    const c = raw.match(cronConstRe);
+    if (c) out.add(`cron:${c[1]}`);
     const j = raw.match(jobKindRe);
     if (j && /poll|index|clone|digest|cron|sync|schedule|job/i.test(raw)) out.add(`job:${j[1]}`);
   }

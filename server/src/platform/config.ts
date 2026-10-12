@@ -28,6 +28,8 @@ const EnvSchema = z.object({
   REPO_INTEL_ENABLED: z.string().optional(),
   // Project Context discovery globs, `;`-separated (globs contain commas). Empty → default.
   PROJECT_CONTEXT_PATTERNS: z.string().optional(),
+  // Scheduled repo sync (node-cron, every 5 minutes). Default ON.
+  REPO_SYNC_ENABLED: z.string().default('true'),
   API_PORT: z.coerce.number().int().default(3001),
   API_HOST: z.string().default('127.0.0.1'),
   WEB_PORT: z.coerce.number().int().default(3000),
@@ -66,6 +68,8 @@ export type AppConfig = {
    * EXACTLY like the ripgrep-only baseline.
    */
   repoIntelEnabled: boolean;
+  /** Whether the scheduled repo sync (node-cron) starts with the server. Env: `REPO_SYNC_ENABLED`. */
+  repoSyncEnabled: boolean;
   /** Project Context discovery globs (apply to every repository). Env: `PROJECT_CONTEXT_PATTERNS`, `;`-separated. */
   projectContextPatterns: string[];
 };
@@ -95,6 +99,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: `http://localhost:${parsed.WEB_PORT}`,
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
+    repoSyncEnabled: Boolean(parsed.REPO_SYNC_ENABLED),
     projectContextPatterns: parsePatterns(parsed.PROJECT_CONTEXT_PATTERNS),
   };
 }
