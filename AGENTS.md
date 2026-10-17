@@ -13,7 +13,7 @@ one line before acting.
 
 ## While working and after finishing
 
-Use the `engineering-insights` skill. Capture a finding the moment it is
+Use the `sdd-engineering:engineering-insights` skill. Capture a finding the moment it is
 verified and non-obvious: a surprising root cause, an abandoned approach, a
 tool quirk, a trade-off decision, or a correction from the user. When a
 non-trivial task is done, sweep for anything you missed. The skill routes

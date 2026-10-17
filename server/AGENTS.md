@@ -43,11 +43,11 @@ pnpm db:seed                                # idempotent demo data
 
 - Read `specs/`, `docs/`, and `INSIGHTS.md` first for what's already
   intended, documented, or tried here. Record non-obvious findings with the
-  `engineering-insights` skill.
+  `sdd-engineering:engineering-insights` skill.
 - Read `README.md` for the API map and the request/DI flow diagram.
 - Read `src/modules/repo-intel/README.md` when touching indexing or the repo
   map.
 - Read `../TESTING.md` before adding a test or changing the unit/integration
   split.
-- Use the `onion-architecture` skill when adding or changing a module, route,
+- Use the `engineering-paved-path:onion-architecture` skill when adding or changing a module, route,
   service, repository, or adapter.

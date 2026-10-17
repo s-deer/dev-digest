@@ -34,7 +34,7 @@ pnpm test         # vitest + jsdom, fetch mocked — no API needed
 
 - Read `specs/`, `docs/`, and `INSIGHTS.md` first for what's already
   intended, documented, or tried here. Record non-obvious findings with the
-  `engineering-insights` skill.
+  `sdd-engineering:engineering-insights` skill.
 - Read `README.md` for the UI route map and which endpoints each page leans
   on.
 - Read `docs/project-context.md` when touching the Project Context page, picker,

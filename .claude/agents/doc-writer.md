@@ -2,7 +2,7 @@
 name: doc-writer
 description: Documents implemented features. Use after a feature is implemented and verified, or when the user asks to turn a plan, spec, implementation report, or existing code into documentation. Knows where each kind of content belongs in this repo (<pkg>/docs/<topic>.md plus its README index, package README sections, TESTING.md, docs/agent-prompts/) versus specs/ (intent) and INSIGHTS.md (lessons), and draws Mermaid diagrams grounded in real code with path:line references. Edits documentation files only; never touches source, tests, or specs.
 tools: Read, Grep, Glob, Edit, Write, Bash
-skills: mermaid-diagram, engineering-insights
+skills: engineering-paved-path:mermaid-diagram, sdd-engineering:engineering-insights
 model: sonnet
 ---
 

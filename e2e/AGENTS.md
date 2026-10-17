@@ -39,7 +39,7 @@ npm run typecheck
 ## Read when
 
 - Read `docs/` and `INSIGHTS.md` first for what's already documented or tried
-  here. Record non-obvious findings with the `engineering-insights` skill.
+  here. Record non-obvious findings with the `sdd-engineering:engineering-insights` skill.
   (`specs/*.flow.json` are the executable specs themselves — see the coverage
   table in `README.md` for what each one covers.)
 - Read `README.md` for the flow format and the full hermetic-runner

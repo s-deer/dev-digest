@@ -18,7 +18,7 @@ npm run inspect    # MCP Inspector against the real stdio server
   first in `@devdigest/shared`, then a port method here.
 - Consumed and run as TypeScript source via `tsx` — never add a build step or
   import from `dist`.
-- The package mirrors the onion (ring rules from `.claude/skills/onion-architecture`,
+- The package mirrors the onion (ring rules from the `engineering-paved-path:onion-architecture` skill,
   applied here even though that skill targets `server/`):
   - Ring 1 (pure): `src/format/*` — shaping, truncation, the untrusted fence,
     result builders. No I/O, no logging.
@@ -75,7 +75,7 @@ npm run inspect    # MCP Inspector against the real stdio server
 
 - Read `specs/`, `docs/plans/mcp-server-plan.md` (via `specs/README.md`), and
   `INSIGHTS.md` first for what's already intended, tried, or rejected here.
-  Record non-obvious findings with the `engineering-insights` skill.
+  Record non-obvious findings with the `sdd-engineering:engineering-insights` skill.
 - Read `README.md` for the tool table, the flow, env vars, error messages, and
   the token-budget rules.
 - Read `../TESTING.md` when adding a test or touching CI.

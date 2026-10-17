@@ -32,7 +32,7 @@ export class ReviewService {
   private executor: ReviewRunExecutor;
   private startRunUseCase: StartRunUseCase<AgentRow>;
 
-  // Known deviation (see .claude/skills/onion-architecture): ReviewService
+  // Known deviation (see the engineering-paved-path:onion-architecture skill): ReviewService
   // takes the whole Container and builds its own repositories. Not deepened
   // here — StartRunUseCase itself only sees the narrow StartRunDeps wired
   // below, so its dedupe/lookup logic stays hermetically testable.

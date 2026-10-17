@@ -6,24 +6,14 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 
 | Skill | Scope | Description |
 |-------|-------|-------------|
-| [fastify-best-practices](fastify-best-practices/SKILL.md) | Backend | Fastify routes, plugins, JSON-schema validation, error handling |
-| [drizzle-orm-patterns](drizzle-orm-patterns/SKILL.md) | Backend | Drizzle schema, queries, relations, transactions, migrations |
-| [postgresql-table-design](postgresql-table-design/SKILL.md) | Backend | Postgres schema design, data types, indexing, constraints |
-| [onion-architecture](onion-architecture/SKILL.md) | Backend | Onion layering for `server/` modules: dependency rule, ports & adapters, composition root |
 | [next-best-practices](next-best-practices/SKILL.md) | Frontend | Next.js App Router, RSC boundaries, data fetching, optimization |
-| [react-best-practices](react-best-practices/SKILL.md) | Frontend | React anti-patterns, state management, hooks rules |
-| [react-architecture](react-architecture/SKILL.md) | Frontend | Where code lives: components, constants, utils/helpers, business logic, data layer, Next.js server code, boundaries. Sources in its README |
-| [react-testing-library](react-testing-library/SKILL.md) | Frontend | General-purpose React Testing Library guide with Vitest |
-| [zod](zod/SKILL.md) | Full-stack | Zod schema validation, parsing, error handling, type inference |
-| [typescript-expert](typescript-expert/SKILL.md) | Full-stack | Type-level programming, performance, tooling, migrations |
-| [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
-| [engineering-insights](engineering-insights/SKILL.md) | Shared | Capture verified non-obvious lessons into per-package INSIGHTS.md |
-| [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
-| [pr-self-review](pr-self-review/SKILL.md) | Shared | Pre-PR review of the local diff with the skills above; a confirmed critical blocks the PR |
-| [run-plan](run-plan/SKILL.md) | Shared | Manual `/run-plan <plan>`: runs an approved plan via implementer (per phase) -> architecture-reviewer -> fix loop -> test-writer (limited) -> plan-verifier. Excludes spec-creator and implementation-planner |
-| [workflow-retro](workflow-retro/SKILL.md) | Shared | Manual `/workflow-retro [deep]`: retrospective of a multi-agent run (tokens, agents, order, duplicates, rubric) with concrete proposals and a row in `docs/retros/ledger.md`. Never auto-triggered |
 
-Adding a review skill? Add a row to [`pr-self-review/routing.md`](pr-self-review/routing.md) so it runs on the right files (or list it under *Not reviewers*). Otherwise `/pr-self-review` warns about an unrouted skill.
+The shared engineering skills (React, Fastify, onion architecture, Drizzle, PostgreSQL, Zod,
+TypeScript, testing, security, Mermaid) and the spec-driven workflow skills (`run-plan`,
+`workflow-retro`, `engineering-insights`) come from the
+[`dev-digest-ai-marketplace`](https://github.com/s-deer/dev-digest-ai-marketplace) plugins
+`engineering-paved-path` and `sdd-engineering`. Do not copy them back here; call them by their
+namespaced name, for example `engineering-paved-path:onion-architecture`.
 
 ## What Are Skills?
 
