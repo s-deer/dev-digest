@@ -1,4 +1,6 @@
-import type { PrStatus } from '@devdigest/shared';
+import { PR_LIST_STATUSES } from '@devdigest/shared';
+import type { PrStatus, PrListStatus } from '@devdigest/shared';
+import { ValidationError } from '../../platform/errors.js';
 
 /**
  * PR-list rollup helpers (pure — no DB / `this`, so they unit-test cleanly).
@@ -52,4 +54,33 @@ export function deriveReviewStatus(args: {
   const staleMs = (args.staleDays ?? STALE_DAYS) * 86_400_000;
   if (updatedAt && now - updatedAt.getTime() > staleMs) return 'stale';
   return 'reviewed';
+}
+
+/**
+ * Parse the `?status=` list filter: comma-separated and/or repeated values,
+ * trimmed, empty segments ignored, case-sensitive against the derived statuses.
+ * Returns `null` when no value remains (unfiltered). Throws a 422
+ * `ValidationError` naming every unknown value (deduped, first-seen order).
+ */
+export function parseStatusFilter(raw: string | string[] | undefined): Set<PrListStatus> | null {
+  const values = (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw])
+    .flatMap((v) => v.split(','))
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+  if (values.length === 0) return null;
+
+  const allowed: readonly string[] = PR_LIST_STATUSES;
+  const invalid: string[] = [];
+  const wanted = new Set<PrListStatus>();
+  for (const v of values) {
+    if (allowed.includes(v)) wanted.add(v as PrListStatus);
+    else if (!invalid.includes(v)) invalid.push(v);
+  }
+  if (invalid.length > 0) {
+    throw new ValidationError(
+      `Invalid status value(s): ${invalid.map((v) => JSON.stringify(v)).join(', ')}`,
+      { invalid, allowed: [...PR_LIST_STATUSES] },
+    );
+  }
+  return wanted;
 }

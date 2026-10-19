@@ -155,6 +155,17 @@ export type Repo = z.infer<typeof Repo>;
 export const PrStatus = z.enum(['needs_review', 'reviewed', 'stale', 'open', 'closed', 'merged']);
 export type PrStatus = z.infer<typeof PrStatus>;
 
+/** Derived review statuses accepted by `GET /repos/:id/pulls?status=` (excludes the raw `open`). */
+export const PR_LIST_STATUSES = ['needs_review', 'reviewed', 'stale', 'merged', 'closed'] as const;
+export const PrListStatus = z.enum(PR_LIST_STATUSES);
+export type PrListStatus = z.infer<typeof PrListStatus>;
+
+/** Raw query for the PR list. Loose on purpose: value validation (and its named-value 422) lives in `parseStatusFilter`. */
+export const PrListQuery = z.object({
+  status: z.union([z.string(), z.array(z.string())]).optional(),
+});
+export type PrListQuery = z.infer<typeof PrListQuery>;
+
 export const PrMeta = z.object({
   id: z.string().nullish(),
   number: z.number().int(),

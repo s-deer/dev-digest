@@ -17,10 +17,10 @@ A spec says WHAT the feature must do and WHY. It never says HOW: no file names, 
 
 ## Who does what
 
-- `spec-creator` (`.claude/agents/spec-creator.md`) writes specs. Its only write scope is a single spec file under this folder or a `<module>/specs/` folder.
+- `sdd-engineering:spec-creator` (provided by the installed marketplace plugin) writes specs. Its only write scope is a single spec file under this folder or a `<module>/specs/` folder.
 - `implementation-planner` consumes an approved spec and produces a plan in `docs/plans/`; every plan step references the AC-IDs it satisfies.
 - `test-writer` and `plan-verifier` trace tests and results back to the same AC-IDs.
 
 ## Template
 
-The spec template (summary, goals/non-goals, user stories, EARS acceptance criteria, edge cases, contracts, open questions, traceability, verification hints) is defined in `.claude/agents/spec-creator.md`.
+The spec template (summary, goals/non-goals, user stories, EARS acceptance criteria, edge cases, contracts, open questions, traceability, verification hints) is defined by `sdd-engineering:spec-creator`.
