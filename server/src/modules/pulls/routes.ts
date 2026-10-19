@@ -1,21 +1,22 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
-import { PrCommentInput } from '@devdigest/shared';
+import type { PrMeta, PrDetail, GitHubClient, PrReviewComment, PrListStatus } from '@devdigest/shared';
+import { PrCommentInput, PrListQuery } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
 import { IdParams } from '../_shared/schemas.js';
 import { AppError, NotFoundError } from '../../platform/errors.js';
-import { deriveReviewStatus } from './status.js';
+import { deriveReviewStatus, parseStatusFilter } from './status.js';
 import { sumRunCosts } from './cost.js';
 import { emptyFindingsSummary } from '../reviews/findings-summary.js';
 
 /**
  * F1 — pulls module. PR import via Octokit (list + per-PR detail).
  *   GET /repos/:id/pulls → list PRs for a repo (open + recently merged/closed,
- *                          synced from GitHub, persisted). `status` is GitHub's
- *                          merge state (open/merged/closed).
+ *                          synced from GitHub, persisted). `status` is the derived
+ *                          review status. Optional `?status=a,b` (or repeated) narrows
+ *                          the list to those statuses; unknown values → 422.
  *   GET /pulls/:id       → full PR detail (diff/files, commits, body, linked issue)
  *
  * Import is idempotent (unique repo_id+number). Review trigger is MANUAL
@@ -25,7 +26,10 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
 
-  app.get('/repos/:id/pulls', { schema: { params: IdParams } }, async (req): Promise<PrMeta[]> => {
+  const listSchema = { params: IdParams, querystring: PrListQuery };
+  app.get('/repos/:id/pulls', { schema: listSchema }, async (req): Promise<PrMeta[]> => {
+    // First, so an invalid filter 422s before any lookup, sync or write.
+    const wanted = parseStatusFilter(req.query.status);
     const { workspaceId } = await getContext(container, req);
     const [repo] = await container.db
       .select()
@@ -147,7 +151,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
     ]);
 
     const now = Date.now();
-    return rows.map((r) => {
+    const list = rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
       return {
         id: r.id,
@@ -176,6 +180,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
           : null,
       };
     });
+    return wanted ? list.filter((p) => wanted.has(p.status as PrListStatus)) : list;
   });
 
   app.get('/pulls/:id', { schema: { params: IdParams } }, async (req): Promise<PrDetail> => {

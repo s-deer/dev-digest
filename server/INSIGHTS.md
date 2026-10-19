@@ -45,6 +45,12 @@ re-discovered the hard way.
 - **Do:** NEVER re-filter declaring-file callers downstream. Fix the facade instead, where the guarantee is pinned by a test.
 - **Evidence:** `server/src/modules/repo-intel/service.ts:284`, `server/src/modules/repo-intel/repository.ts:408`, test "getBlastRadius ripgrep fallback excludes references from the symbol's declaring file" in `server/test/repo-intel-facade-degraded.test.ts`.
 
+### 2026-10-18 · A 422 that must name the bad values comes from a helper throwing `ValidationError`, not from a Zod refinement on the route schema
+- **Context:** any route whose validation error must say which input was wrong, e.g. `GET /repos/:id/pulls?status=`.
+- **Insight:** Schema failures from `fastify-type-provider-zod` hit the first branch of the global handler, which hardcodes `message: 'Request validation failed'` and sends raw Zod issues as `details`. A refinement can't change that envelope without branching the shared handler for one endpoint. `AppError` subclasses pass their own `message`/`details` through the handler unchanged.
+- **Do:** Keep the route schema loose (shape only, e.g. `string | string[]`), then validate values in a pure ring-1 helper that throws `ValidationError(msg, details)`, called as the handler's first statement so nothing does I/O first. NEVER edit `src/app.ts` for one endpoint's error shape.
+- **Evidence:** `server/src/app.ts:124`, `server/src/modules/pulls/status.ts:65`, test file `server/test/pulls-status-filter.it.test.ts` (422 `details` deep-equals `{ invalid, allowed }`).
+
 ## Gotchas & recurring errors
 
 ### 2026-09-15 · The server and client copies of `@devdigest/shared` have already drifted apart
@@ -124,6 +130,7 @@ re-discovered the hard way.
 - **Insight:** `Container.llm`/`Container.github` fall back to real secrets (`~/.devdigest/secrets.json`, then `process.env`) whenever a test's `overrides` doesn't cover the provider used. On a dev machine with a real `GITHUB_TOKEN`/`OPENROUTER_API_KEY` configured, unmocked review tests silently made real network calls, pushing 3 previously-fast tests past their own internal timeouts (`waitForPrRuns`'s 10s default, one test's own 2s `waitUntil`) — they failed with unrelated-looking assertion errors (`trace` undefined, `tokens_in: null`), not a timeout message.
 - **Do:** Every `overrides` block that builds an app and calls `/pulls/:id/review` must set `github: new MockGitHubClient()` and `llm.openrouter: new MockLLMProvider('openrouter')` (an empty fixture is fine — it fails `PrIntent` validation and the run just logs `intent: skipped`), even in tests that aren't about intent at all.
 - **Evidence:** `server/test/reviews.it.test.ts` `appWith()` and 3 ad-hoc `buildApp` overrides blocks; before the fix `pnpm exec vitest run test/reviews.it.test.ts` took ~71s with 4 failures, after ~4s with 0 failures.
+> **Update 2026-10-18:** The same fallback means leaving out `overrides.github` does *not* simulate "no token" on a dev machine. `overrides.github` takes only a client object, so to test the offline path replace the method after `buildApp`: `app.container.github = async () => { throw new ConfigError('...') }` (see `server/test/pulls-status-filter.it.test.ts`, "offline" `it.each`).
 
 ### 2026-09-26 · `pr_files.id` is a random `uuid`, not an insertion-ordered key — don't `ORDER BY id` to recover GitHub file order
 - **Context:** `SmartDiffRepository.getPrFiles` (`server/src/modules/smart-diff/repository.ts`), which needs the PR's files in the same order GitHub returned them (import order) to keep "GitHub order kept inside each group" from the smart-diff spec.

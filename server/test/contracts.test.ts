@@ -15,6 +15,9 @@ import {
   Settings,
   Repo,
   PrDetail,
+  PrStatus,
+  PR_LIST_STATUSES,
+  PrListQuery,
   PrIntentRecord,
   PromptAssembly,
   GenerateIntentBody,
@@ -411,5 +414,19 @@ describe('PrBriefRecord risk line', () => {
     expect(PrBriefRecord.safeParse({ ...base, risks: [{ ...r1, line: 12 }] }).success).toBe(true);
     const withCounters = { ...base.grounding, risk_lines_snapped: 1, risk_lines_dropped: 2 };
     expect(PrBriefRecord.safeParse({ ...base, risks: [], grounding: withCounters }).success).toBe(true);
+  });
+});
+
+describe('PR list status query contract', () => {
+  it('allowed set is the five derived statuses, excludes open, subset of PrStatus', () => {
+    expect([...PR_LIST_STATUSES]).toEqual(['needs_review', 'reviewed', 'stale', 'merged', 'closed']);
+    expect(PR_LIST_STATUSES as readonly string[]).not.toContain('open');
+    for (const s of PR_LIST_STATUSES) expect(PrStatus.options).toContain(s);
+  });
+
+  it('PrListQuery accepts undefined, a string and a string[]', () => {
+    expect(PrListQuery.parse({})).toEqual({});
+    expect(PrListQuery.parse({ status: 'stale,merged' })).toEqual({ status: 'stale,merged' });
+    expect(PrListQuery.parse({ status: ['stale', 'merged'] })).toEqual({ status: ['stale', 'merged'] });
   });
 });
